@@ -106,7 +106,7 @@
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 30px 20px 100px 20px; /* Adicionado padding-bottom para espaço do botão flutuante */
+            padding: 30px 20px 100px 20px;
         }
         
         /* Cards */
@@ -806,7 +806,7 @@
         <!-- Info Box -->
         <div class="info-box success">
             <h3>🚀 Sistema Atualizado!</h3>
-            <p><strong>Novas funcionalidades:</strong> Campo "Aprovador" + escolha de diretório para salvamento + download automático de JSON + geração completa de PDF. Interface otimizada para desktop com melhor experiência de usuário.</p>
+            <p><strong>Correções implementadas:</strong> Campo "Aprovador" adicionado + correção do carregamento de JSON + numeração de produtos corrigida. Interface otimizada para desktop com melhor experiência de usuário.</p>
         </div>
         
         <!-- Informações Básicas -->
@@ -822,21 +822,26 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="sacNumber">Número do SAC</label>
-                    <input type="text" id="sacNumber" class="form-control" placeholder="Ex: SAC-2024-001">
+                    <label for="approverName">Nome do Aprovador</label>
+                    <input type="text" id="approverName" class="form-control" placeholder="Digite o nome completo do aprovador">
                 </div>
             </div>
             
             <div class="form-row">
                 <div class="form-group">
-                    <label for="invoiceNumber">Nota Fiscal</label>
-                    <input type="text" id="invoiceNumber" class="form-control" placeholder="Ex: NF-123456">
+                    <label for="sacNumber">Número do SAC</label>
+                    <input type="text" id="sacNumber" class="form-control" placeholder="Ex: SAC-2024-001">
                 </div>
                 
                 <div class="form-group">
-                    <label for="clientName">Cliente</label>
-                    <input type="text" id="clientName" class="form-control" placeholder="Nome da empresa ou cliente">
+                    <label for="invoiceNumber">Nota Fiscal</label>
+                    <input type="text" id="invoiceNumber" class="form-control" placeholder="Ex: NF-123456">
                 </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="clientName">Cliente</label>
+                <input type="text" id="clientName" class="form-control" placeholder="Nome da empresa ou cliente">
             </div>
         </div>
         
@@ -844,7 +849,6 @@
         <div class="card">
             <div class="card-header">
                 <h2 class="card-title">🔧 Produtos para Inspeção</h2>
-                <!-- Removido o botão daqui pois agora é flutuante -->
             </div>
             
             <div id="productsContainer"></div>
@@ -1039,7 +1043,7 @@
 
         // Template do produto
         const productTemplate = `
-            <div class="product-item">
+            <div class="product-item" data-product-id="PRODUCT_ID">
                 <div class="product-header">
                     <h3 class="product-title">Produto #PRODUCT_NUMBER</h3>
                     <button class="remove-product" onclick="removeProduct('PRODUCT_ID')">×</button>
@@ -1079,7 +1083,7 @@
                         <label for="defectCause_PRODUCT_ID">Causa do Problema</label>
                         <select id="defectCause_PRODUCT_ID" class="form-control">
                             <option value="">Selecione a causa</option>
-     			    <option value="Driver">Driver</option>
+                            <option value="Driver">Driver</option>
                             <option value="Fabricação">Defeito de Fabricação</option>
                             <option value="Uso">Uso Inadequado</option>
                             <option value="Desgaste">Desgaste Natural</option>
@@ -1113,6 +1117,17 @@
                 </div>
             </div>
         `;
+
+        // Função para renumerar produtos
+        function renumberProducts() {
+            const productItems = document.querySelectorAll('.product-item');
+            productItems.forEach((item, index) => {
+                const title = item.querySelector('.product-title');
+                if (title) {
+                    title.textContent = `Produto #${index + 1}`;
+                }
+            });
+        }
 
         // Função para mostrar notificações
         function showNotification(message, type = 'info') {
@@ -1155,11 +1170,9 @@
                     images: []
                 });
                 
-                // Aguardar um momento para o DOM atualizar antes de configurar eventos
                 setTimeout(() => {
                     setupProductEvents(productId);
                     
-                    // Scroll suave para o novo produto
                     const newProductName = document.getElementById('productName_' + productId);
                     if (newProductName) {
                         newProductName.scrollIntoView({
@@ -1185,15 +1198,13 @@
                 }
                 
                 if (confirm('Tem certeza que deseja remover este produto?')) {
-                    const productElement = document.querySelector(`#productName_${productId}`);
+                    const productElement = document.querySelector(`[data-product-id="${productId}"]`);
                     if (productElement) {
-                        const productItem = productElement.closest('.product-item');
-                        if (productItem) {
-                            productItem.remove();
-                        }
+                        productElement.remove();
                     }
                     
                     productsData = productsData.filter(p => p.id !== productId);
+                    renumberProducts(); // Renumerar produtos após remoção
                     showNotification('Produto removido com sucesso!', 'info');
                 }
             } catch (error) {
@@ -1205,7 +1216,6 @@
         // Configurar eventos do produto
         function setupProductEvents(productId) {
             try {
-                // Verificar se os elementos existem antes de configurar eventos
                 const defectCauseSelect = document.getElementById('defectCause_' + productId);
                 const imagesInput = document.getElementById('productImages_' + productId);
                 const imagesContainer = document.getElementById('imagesContainer_' + productId);
@@ -1214,11 +1224,6 @@
                     console.warn(`Alguns elementos não encontrados para produto ${productId}`);
                     return;
                 }
-                
-                // Campo "outros" para causa
-                defectCauseSelect.addEventListener('change', function() {
-                    // Implementar lógica se necessário
-                });
                 
                 // Upload de imagens
                 imagesInput.addEventListener('change', function(e) {
@@ -1275,7 +1280,6 @@
                 const products = [];
                 
                 for (const product of productsData) {
-                    // Verificar se todos os elementos existem antes de acessar
                     const nameEl = document.getElementById('productName_' + product.id);
                     const modelEl = document.getElementById('productModel_' + product.id);
                     const serialEl = document.getElementById('serialNumber_' + product.id);
@@ -1304,24 +1308,23 @@
                     });
                 }
                 
-                // Verificar elementos básicos
                 const inspectorEl = document.getElementById('inspectorName');
+                const approverEl = document.getElementById('approverName');
                 const sacEl = document.getElementById('sacNumber');
                 const invoiceEl = document.getElementById('invoiceNumber');
                 const clientEl = document.getElementById('clientName');
-                const approverEl = document.getElementById('approverName');
                 
                 return {
                     inspectorName: inspectorEl ? inspectorEl.value || '' : '',
+                    approverName: approverEl ? approverEl.value || '' : '',
                     sacNumber: sacEl ? sacEl.value || '' : '',
                     invoiceNumber: invoiceEl ? invoiceEl.value || '' : '',
                     clientName: clientEl ? clientEl.value || '' : '',
-                    approverName: approverEl ? approverEl.value || '' : '',
                     inspectionDate: moment().format('LL'),
                     inspectionTime: moment().format('LT'),
                     companyLogo,
                     products,
-                    version: '3.0-desktop',
+                    version: '3.1-desktop-fixed',
                     savedAt: new Date().toISOString()
                 };
             } catch (error) {
@@ -1356,7 +1359,6 @@
         // Escolher diretório e salvar arquivo
         async function saveFileWithDirectoryPicker(content, fileName, mimeType = 'application/json') {
             try {
-                // Verificar se a File System Access API está disponível
                 if (!('showSaveFilePicker' in window)) {
                     return false;
                 }
@@ -1385,7 +1387,6 @@
                 return true;
                 
             } catch (error) {
-                // Se o usuário cancelou, não é um erro
                 if (error.name === 'AbortError') {
                     return false;
                 }
@@ -1407,7 +1408,6 @@
             const fileName = `inspecao_${data.inspectorName.replace(/\s+/g, '_')}_${moment().format('YYYY-MM-DD_HH-mm')}.json`;
             const jsonStr = JSON.stringify(data, null, 2);
             
-            // Tentar salvar com seleção de diretório primeiro
             const savedWithPicker = await saveFileWithDirectoryPicker(jsonStr, fileName);
             
             if (savedWithPicker) {
@@ -1415,7 +1415,6 @@
             } else if (tryAutomaticDownload(jsonStr, fileName)) {
                 showNotification('✅ Projeto salvo automaticamente!', 'success');
             } else {
-                // Fallback para clipboard
                 if (navigator.clipboard) {
                     navigator.clipboard.writeText(jsonStr).then(() => {
                         showNotification('📋 Dados copiados para área de transferência!', 'info');
@@ -1474,17 +1473,40 @@
             const file = event.target.files[0];
             if (!file) return;
             
+            // Verificar se é um arquivo JSON
+            if (!file.name.toLowerCase().endsWith('.json')) {
+                showNotification('Por favor, selecione um arquivo JSON válido.', 'error');
+                return;
+            }
+            
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const projectData = JSON.parse(e.target.result);
+                    
+                    // Validação básica do JSON
+                    if (!projectData || typeof projectData !== 'object') {
+                        throw new Error('Arquivo JSON inválido ou corrompido');
+                    }
+                    
+                    if (!projectData.products || !Array.isArray(projectData.products)) {
+                        throw new Error('Estrutura de produtos inválida no arquivo JSON');
+                    }
+                    
                     loadProjectData(projectData);
                     closeLoadModal();
                     showNotification('Projeto carregado com sucesso!', 'success');
+                    
                 } catch (error) {
-                    showNotification('Erro ao carregar o projeto. Verifique se o arquivo está correto.', 'error');
+                    console.error('Erro ao carregar projeto:', error);
+                    showNotification(`Erro ao carregar o projeto: ${error.message}`, 'error');
                 }
             };
+            
+            reader.onerror = function() {
+                showNotification('Erro ao ler o arquivo. Tente novamente.', 'error');
+            };
+            
             reader.readAsText(file);
             event.target.value = '';
         }
@@ -1497,11 +1519,21 @@
                 productCounter = 0;
                 
                 // Carregar dados básicos
-                document.getElementById('inspectorName').value = data.inspectorName || '';
-                document.getElementById('sacNumber').value = data.sacNumber || '';
-                document.getElementById('invoiceNumber').value = data.invoiceNumber || '';
-                document.getElementById('clientName').value = data.clientName || '';
-                document.getElementById('approverName').value = data.approverName || '';
+                if (document.getElementById('inspectorName')) {
+                    document.getElementById('inspectorName').value = data.inspectorName || '';
+                }
+                if (document.getElementById('approverName')) {
+                    document.getElementById('approverName').value = data.approverName || '';
+                }
+                if (document.getElementById('sacNumber')) {
+                    document.getElementById('sacNumber').value = data.sacNumber || '';
+                }
+                if (document.getElementById('invoiceNumber')) {
+                    document.getElementById('invoiceNumber').value = data.invoiceNumber || '';
+                }
+                if (document.getElementById('clientName')) {
+                    document.getElementById('clientName').value = data.clientName || '';
+                }
                 
                 // Carregar logo
                 if (data.companyLogo) {
@@ -1517,11 +1549,13 @@
                 } else {
                     addProduct();
                 }
+                
+                console.log('Projeto carregado com sucesso');
+                
             } catch (error) {
                 console.error('Erro ao carregar dados do projeto:', error);
                 showNotification('Erro ao carregar alguns dados do projeto. Verifique o arquivo.', 'warning');
                 
-                // Garantir que há pelo menos um produto mesmo com erro
                 if (productsData.length === 0) {
                     addProduct();
                 }
@@ -1543,29 +1577,42 @@
                 images: productData.images || []
             });
             
-            setupProductEvents(productId);
-            
-            // Preencher campos
-            document.getElementById('productName_' + productId).value = productData.name || '';
-            document.getElementById('productModel_' + productId).value = productData.model || '';
-            document.getElementById('serialNumber_' + productId).value = productData.serialNumber || '';
-            document.getElementById('purchaseDate_' + productId).value = productData.purchaseDate || '';
-            document.getElementById('defectDescription_' + productId).value = productData.defectDescription || '';
-            document.getElementById('defectCause_' + productId).value = productData.defectCause || '';
-            document.getElementById('warrantyStatus_' + productId).value = productData.warrantyStatus || '';
-            document.getElementById('observations_' + productId).value = productData.observations || '';
-            
-            // Carregar imagens
-            if (productData.images && productData.images.length > 0) {
-                const imagesContainer = document.getElementById('imagesContainer_' + productId);
-                productData.images.forEach(imageData => {
-                    const img = document.createElement('img');
-                    img.src = imageData;
-                    img.className = 'image-preview';
-                    img.onclick = () => showImageFullscreen(imageData);
-                    imagesContainer.appendChild(img);
+            setTimeout(() => {
+                setupProductEvents(productId);
+                
+                // Preencher campos com verificações de segurança
+                const fields = {
+                    'productName_': productData.name || '',
+                    'productModel_': productData.model || '',
+                    'serialNumber_': productData.serialNumber || '',
+                    'purchaseDate_': productData.purchaseDate || '',
+                    'defectDescription_': productData.defectDescription || '',
+                    'defectCause_': productData.defectCause || '',
+                    'warrantyStatus_': productData.warrantyStatus || '',
+                    'observations_': productData.observations || ''
+                };
+                
+                Object.entries(fields).forEach(([fieldPrefix, value]) => {
+                    const element = document.getElementById(fieldPrefix + productId);
+                    if (element) {
+                        element.value = value;
+                    }
                 });
-            }
+                
+                // Carregar imagens
+                if (productData.images && productData.images.length > 0) {
+                    const imagesContainer = document.getElementById('imagesContainer_' + productId);
+                    if (imagesContainer) {
+                        productData.images.forEach(imageData => {
+                            const img = document.createElement('img');
+                            img.src = imageData;
+                            img.className = 'image-preview';
+                            img.onclick = () => showImageFullscreen(imageData);
+                            imagesContainer.appendChild(img);
+                        });
+                    }
+                }
+            }, 100);
         }
 
         // Colar JSON
@@ -1595,8 +1642,11 @@
                 
                 loadProjectData(projectData);
                 closePasteModal();
+                document.getElementById('pasteJson').value = '';
                 showNotification('Projeto carregado com sucesso!', 'success');
+                
             } catch (error) {
+                console.error('Erro ao processar JSON:', error);
                 showNotification('Erro ao processar o JSON. Verifique se o formato está correto.', 'error');
             }
         }
@@ -1605,12 +1655,11 @@
         function fillTestData() {
             try {
                 document.getElementById('inspectorName').value = 'Carlos Silva';
+                document.getElementById('approverName').value = 'Ana Santos';
                 document.getElementById('sacNumber').value = 'SAC-2024-DT001';
                 document.getElementById('invoiceNumber').value = 'NF-789456';
                 document.getElementById('clientName').value = 'TechCorp Desktop Solutions';
-                document.getElementById('approverName').value = 'Ana Santos';
                 
-                // Garantir que há pelo menos um produto
                 if (productsData.length === 0) {
                     addProduct();
                 }
@@ -1659,10 +1708,10 @@
         function resetForm() {
             if (confirm('Tem certeza que deseja limpar todos os dados do formulário?')) {
                 document.getElementById('inspectorName').value = '';
+                document.getElementById('approverName').value = '';
                 document.getElementById('sacNumber').value = '';
                 document.getElementById('invoiceNumber').value = '';
                 document.getElementById('clientName').value = '';
-                document.getElementById('approverName').value = '';
                 
                 document.getElementById('productsContainer').innerHTML = '';
                 productsData = [];
@@ -1680,7 +1729,6 @@
             try {
                 const formData = collectFormData();
                 
-                // Validação
                 if (!formData.inspectorName) {
                     showNotification('Por favor, informe o nome do verificador.', 'error');
                     return;
@@ -1702,29 +1750,25 @@
                     return;
                 }
 
-                // Mostrar loader
                 document.getElementById('loader').style.display = 'flex';
 
-                // Preencher dados no template do PDF com verificações de segurança
-                const pdfInspectorName = document.getElementById('pdfInspectorName');
-                const pdfApproverName = document.getElementById('pdfApproverName');
-                const pdfSacNumber = document.getElementById('pdfSacNumber');
-                const pdfInvoiceNumber = document.getElementById('pdfInvoiceNumber');
-                const pdfClientName = document.getElementById('pdfClientName');
-                const pdfDateTime = document.getElementById('pdfDateTime');
-                const pdfDate = document.getElementById('pdfDate');
-                const signatureName = document.getElementById('signatureName');
-                const approverSignatureName = document.getElementById('approverSignatureName');
+                // Preencher dados no template do PDF
+                const pdfElements = {
+                    'pdfInspectorName': formData.inspectorName,
+                    'pdfApproverName': formData.approverName || 'Não informado',
+                    'pdfSacNumber': formData.sacNumber || 'Não informado',
+                    'pdfInvoiceNumber': formData.invoiceNumber || 'Não informado',
+                    'pdfClientName': formData.clientName || 'Não informado',
+                    'pdfDateTime': `${formData.inspectionDate} às ${formData.inspectionTime}`,
+                    'pdfDate': formData.inspectionDate,
+                    'signatureName': formData.inspectorName,
+                    'approverSignatureName': formData.approverName || 'Não informado'
+                };
                 
-                if (pdfInspectorName) pdfInspectorName.textContent = formData.inspectorName;
-                if (pdfApproverName) pdfApproverName.textContent = formData.approverName || 'Não informado';
-                if (pdfSacNumber) pdfSacNumber.textContent = formData.sacNumber || 'Não informado';
-                if (pdfInvoiceNumber) pdfInvoiceNumber.textContent = formData.invoiceNumber || 'Não informado';
-                if (pdfClientName) pdfClientName.textContent = formData.clientName || 'Não informado';
-                if (pdfDateTime) pdfDateTime.textContent = `${formData.inspectionDate} às ${formData.inspectionTime}`;
-                if (pdfDate) pdfDate.textContent = formData.inspectionDate;
-                if (signatureName) signatureName.textContent = formData.inspectorName;
-                if (approverSignatureName) approverSignatureName.textContent = formData.approverName || 'Não informado';
+                Object.entries(pdfElements).forEach(([id, value]) => {
+                    const element = document.getElementById(id);
+                    if (element) element.textContent = value;
+                });
                 
                 // Logo no PDF
                 const pdfLogo = document.getElementById('pdfLogo');
@@ -1795,14 +1839,11 @@
                     pdfProductsContainer.innerHTML += productHTML;
                 });
 
-                // Mostrar conteúdo do PDF
                 const pdfContent = document.getElementById('pdfContent');
                 pdfContent.style.display = 'block';
                 
-                // Aguardar carregamento de imagens
                 await waitForImages(pdfContent);
 
-                // Gerar PDF com jsPDF
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({
                     orientation: 'portrait',
@@ -1834,7 +1875,6 @@
                     doc.line(10, 20, 200, 20);
                 }
                 
-                // Verificar se todos os elementos do PDF existem
                 const title = document.querySelector('.pdf-title');
                 const info = document.querySelector('.pdf-info');
                 const signature = document.querySelector('.pdf-signature');
@@ -1844,7 +1884,6 @@
                     throw new Error('Elementos necessários para o PDF não foram encontrados');
                 }
                 
-                // Adicionar título
                 await html2canvas(title, { scale: 2 }).then(canvas => {
                     const imgData = canvas.toDataURL('image/jpeg', 1.0);
                     doc.addImage(imgData, 'JPEG', 10, 25, 190, canvas.height * 190 / canvas.width);
@@ -1853,7 +1892,6 @@
                 
                 let y = 60;
                 
-                // Adicionar informações básicas
                 await html2canvas(info, { scale: 2 }).then(canvas => {
                     const imgData = canvas.toDataURL('image/jpeg', 1.0);
                     const imageHeight = canvas.height * 190 / canvas.width;
@@ -1861,7 +1899,6 @@
                     y += imageHeight + 10;
                 });
                 
-                // Adicionar produtos
                 for (let i = 0; i < products.length; i++) {
                     await html2canvas(products[i], { scale: 2 }).then(canvas => {
                         const imgData = canvas.toDataURL('image/jpeg', 1.0);
@@ -1878,24 +1915,21 @@
                     });
                 }
                 
-                // Adicionar assinaturas com espaço generoso
                 await html2canvas(signature, { scale: 2 }).then(canvas => {
                     const imgData = canvas.toDataURL('image/jpeg', 1.0);
                     const imageHeight = canvas.height * 190 / canvas.width;
                     
-                    // Garantir espaço suficiente para assinaturas (mínimo 120mm)
                     if (y + Math.max(imageHeight, 120) > 260) {
                         doc.addPage();
                         addHeader(doc);
-                        y = 60; // Posição confortável no topo da nova página
+                        y = 60;
                     } else {
-                        y += 30; // Espaço generoso antes das assinaturas
+                        y += 30;
                     }
                     
                     doc.addImage(imgData, 'JPEG', 10, y, 190, imageHeight);
                 });
                 
-                // Adicionar numeração de páginas
                 const totalPages = doc.internal.getNumberOfPages();
                 for (let i = 1; i <= totalPages; i++) {
                     doc.setPage(i);
@@ -1904,11 +1938,9 @@
                     doc.text(`Página ${i} de ${totalPages}`, 105, 290, { align: 'center' });
                 }
                 
-                // Salvar PDF
                 const fileName = `inspecao_produtos_${moment().format('YYYY-MM-DD')}.pdf`;
                 
                 try {
-                    // Tentar salvar com escolha de diretório primeiro
                     const pdfBlob = doc.output('blob');
                     const savedWithPicker = await saveFileWithDirectoryPicker(pdfBlob, fileName, 'application/pdf');
                     
@@ -1918,7 +1950,6 @@
                         throw new Error('Picker não disponível');
                     }
                 } catch (pickerError) {
-                    // Fallback para download automático
                     doc.save(fileName);
                     showNotification('📄 PDF gerado com sucesso!', 'success');
                 }
@@ -1940,7 +1971,6 @@
                     .map(img => new Promise(resolve => {
                         img.onload = resolve;
                         img.onerror = resolve;
-                        // Timeout de segurança
                         setTimeout(resolve, 5000);
                     }));
                 
@@ -1967,7 +1997,6 @@
                 issues.push('Biblioteca moment.js não carregada');
             }
             
-            // Verificar elementos essenciais do DOM
             const essentialElements = [
                 'productsContainer',
                 'pdfContent',
@@ -1995,92 +2024,62 @@
         // Inicialização
         document.addEventListener('DOMContentLoaded', function() {
             try {
-                // Verificar dependências primeiro
                 checkDependencies();
                 
-                // Atualizar data/hora
                 updateDateTime();
                 setInterval(updateDateTime, 60000);
                 
-                // Adicionar primeiro produto
                 addProduct();
                 
                 // Event listeners principais
-                const floatingBtn = document.getElementById('floatingAddBtn');
-                const fillTestBtn = document.getElementById('fillTestBtn');
-                const quickSaveBtn = document.getElementById('quickSaveBtn');
-                const saveProjectBtn = document.getElementById('saveProjectBtn');
-                const loadProjectBtn = document.getElementById('loadProjectBtn');
-                const pasteProjectBtn = document.getElementById('pasteProjectBtn');
-                const generatePDFBtn = document.getElementById('generatePDFBtn');
-                const resetFormBtn = document.getElementById('resetFormBtn');
+                const eventHandlers = [
+                    ['floatingAddBtn', 'click', addProduct],
+                    ['fillTestBtn', 'click', fillTestData],
+                    ['quickSaveBtn', 'click', quickSave],
+                    ['saveProjectBtn', 'click', showSaveModal],
+                    ['loadProjectBtn', 'click', showLoadModal],
+                    ['pasteProjectBtn', 'click', showPasteModal],
+                    ['generatePDFBtn', 'click', generatePDF],
+                    ['resetFormBtn', 'click', resetForm],
+                    ['closeSaveModal', 'click', closeSaveModal],
+                    ['closeSaveModal2', 'click', closeSaveModal],
+                    ['copyJsonBtn', 'click', copyJson],
+                    ['tryDownloadBtn', 'click', tryDownload],
+                    ['closeLoadModal', 'click', closeLoadModal],
+                    ['cancelLoadBtn', 'click', closeLoadModal],
+                    ['closePasteModal', 'click', closePasteModal],
+                    ['cancelPasteBtn', 'click', closePasteModal],
+                    ['loadPastedBtn', 'click', loadPastedJson]
+                ];
                 
-                if (floatingBtn) floatingBtn.addEventListener('click', addProduct);
-                if (fillTestBtn) fillTestBtn.addEventListener('click', fillTestData);
-                if (quickSaveBtn) quickSaveBtn.addEventListener('click', quickSave);
-                if (saveProjectBtn) saveProjectBtn.addEventListener('click', showSaveModal);
-                if (loadProjectBtn) loadProjectBtn.addEventListener('click', showLoadModal);
-                if (pasteProjectBtn) pasteProjectBtn.addEventListener('click', showPasteModal);
-                if (generatePDFBtn) generatePDFBtn.addEventListener('click', generatePDF);
-                if (resetFormBtn) resetFormBtn.addEventListener('click', resetForm);
+                eventHandlers.forEach(([id, event, handler]) => {
+                    const element = document.getElementById(id);
+                    if (element && handler) {
+                        element.addEventListener(event, handler);
+                    }
+                });
                 
-                // Modal events
-                const closeSaveModal1 = document.getElementById('closeSaveModal');
-                const closeSaveModal2 = document.getElementById('closeSaveModal2');
-                const copyJsonBtn = document.getElementById('copyJsonBtn');
-                const tryDownloadBtn = document.getElementById('tryDownloadBtn');
-                
-                if (closeSaveModal1) closeSaveModal1.addEventListener('click', closeSaveModal);
-                if (closeSaveModal2) closeSaveModal2.addEventListener('click', closeSaveModal);
-                if (copyJsonBtn) copyJsonBtn.addEventListener('click', copyJson);
-                if (tryDownloadBtn) tryDownloadBtn.addEventListener('click', tryDownload);
-                
-                const closeLoadModal1 = document.getElementById('closeLoadModal');
-                const cancelLoadBtn = document.getElementById('cancelLoadBtn');
-                
-                if (closeLoadModal1) closeLoadModal1.addEventListener('click', closeLoadModal);
-                if (cancelLoadBtn) cancelLoadBtn.addEventListener('click', closeLoadModal);
-                
-                const closePasteModal1 = document.getElementById('closePasteModal');
-                const cancelPasteBtn = document.getElementById('cancelPasteBtn');
-                const loadPastedBtn = document.getElementById('loadPastedBtn');
-                
-                if (closePasteModal1) closePasteModal1.addEventListener('click', closePasteModal);
-                if (cancelPasteBtn) cancelPasteBtn.addEventListener('click', closePasteModal);
-                if (loadPastedBtn) loadPastedBtn.addEventListener('click', loadPastedJson);
-                
-                // File inputs
+                // Logo
                 const logoContainer = document.getElementById('logoContainer');
                 const logoInput = document.getElementById('logoInput');
                 
-                if (logoContainer) {
-                    logoContainer.addEventListener('click', () => {
-                        if (logoInput) logoInput.click();
-                    });
-                }
-                
-                if (logoInput) {
+                if (logoContainer && logoInput) {
+                    logoContainer.addEventListener('click', () => logoInput.click());
                     logoInput.addEventListener('change', function(e) {
                         const file = e.target.files[0];
                         if (file) processLogo(file);
                     });
                 }
                 
+                // File input para carregar
                 const fileUploadArea = document.getElementById('fileUploadArea');
                 const fileInput = document.getElementById('fileInput');
                 
-                if (fileUploadArea) {
-                    fileUploadArea.addEventListener('click', () => {
-                        if (fileInput) fileInput.click();
-                    });
-                }
-                
-                if (fileInput) {
+                if (fileUploadArea && fileInput) {
+                    fileUploadArea.addEventListener('click', () => fileInput.click());
                     fileInput.addEventListener('change', loadProject);
-                }
-                
-                // Drag and drop para upload
-                if (fileUploadArea) {
+                    
+                    // Drag and drop
                     fileUploadArea.addEventListener('dragover', function(e) {
                         e.preventDefault();
                         this.classList.add('dragover');
@@ -2113,6 +2112,7 @@
                 });
                 
                 console.log('✅ Sistema inicializado com sucesso');
+                showNotification('Sistema inicializado com correções aplicadas!', 'success');
                 
             } catch (error) {
                 console.error('Erro durante a inicialização:', error);
