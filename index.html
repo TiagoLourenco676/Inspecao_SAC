@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção v6.1 - Advanced Labs</title>
+    <title>Sistema de Inspeção v6.2 - Advanced Labs</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -71,22 +71,26 @@
 
         .fab { position: fixed; bottom: 25px; right: 25px; width: 55px; height: 55px; background: var(--success); color: white; border-radius: 50%; border: none; font-size: 28px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
 
-        /* PDF TEMPLATE (ESCONDIDO) */
+        /* PDF TEMPLATE (ESCONDIDO NA TELA) */
         #pdf-template { display: none; background: white; padding: 30px; width: 800px; margin: 0 auto; color: #333; }
-        .pdf-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px; }
+        
+        /* Ajustes para o PDF não cortar o fundo */
+        .pdf-section { background: white; margin-bottom: 20px; } 
+
+        .pdf-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px; background: white; }
         .pdf-logo { width: 80px; height: auto; object-fit: contain; }
         .pdf-title h2 { margin: 0; font-size: 24px; color: var(--secondary); }
         .pdf-info-box { background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; }
         
         /* Dashboard no PDF */
-        .pdf-dash-section { border: 1px solid #ddd; border-radius: 5px; padding: 15px; margin-bottom: 20px; page-break-inside: avoid; }
+        .pdf-dash-section { border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: white; }
         .pdf-stats-row { display: flex; justify-content: space-between; margin-bottom: 15px; text-align: center; }
         .pdf-stat-box { background: #eee; padding: 10px; width: 30%; border-radius: 4px; }
         .pdf-charts-row { display: flex; justify-content: space-between; align-items: center; }
         .pdf-chart-img { width: 48%; height: auto; border: 1px solid #eee; }
 
         /* Estilo do Item no PDF */
-        .pdf-product { border: 1px solid #ccc; margin-bottom: 10px; break-inside: avoid; }
+        .pdf-product { border: 1px solid #ccc; margin-bottom: 15px; background: white; border-radius: 4px; overflow: hidden;}
         .pdf-prod-header { 
             background: #eee; padding: 8px 10px; font-weight: bold; 
             display: flex; justify-content: space-between; border-bottom: 1px solid #ccc;
@@ -96,7 +100,7 @@
         .pdf-lbl { font-weight: bold; width: 100px; }
         .pdf-val { flex: 1; }
         .pdf-imgs { display: flex; gap: 5px; margin-top: 10px; flex-wrap: wrap; }
-        .pdf-img { width: 80px; height: 80px; object-fit: cover; border: 1px solid #ddd; }
+        .pdf-img { width: 70px; height: 70px; object-fit: cover; border: 1px solid #ddd; }
         
         .status-badge-ok { color: #27ae60; font-weight: bold; text-transform: uppercase; }
         .status-badge-no { color: #c0392b; font-weight: bold; text-transform: uppercase; }
@@ -110,7 +114,7 @@
             <div id="headerLogoPlaceholder" class="logo-placeholder">🏢</div>
             <div>
                 <h1 style="font-size: 18px; margin:0;">Sistema de Inspeção</h1>
-                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.1 - Advanced Labs</p>
+                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.2 - Quebra de Página Corrigida</p>
             </div>
         </div>
         <div style="text-align: right; font-size: 12px;">
@@ -133,7 +137,6 @@
     </div>
 
     <div class="container">
-        
         <div id="view-form" class="view-section active">
             <div class="card">
                 <h3>📋 Dados Gerais</h3>
@@ -170,22 +173,23 @@
     <datalist id="dbList"></datalist>
 
     <div id="pdf-template">
-        <div class="pdf-header">
-            <div class="pdf-title">
-                <h2>Relatório de Análise Técnica</h2>
-                <p>Controle de Garantia e Qualidade</p>
+        <div id="pdf-block-header" class="pdf-section">
+            <div class="pdf-header">
+                <div class="pdf-title">
+                    <h2>Relatório de Análise Técnica</h2>
+                    <p>Controle de Garantia e Qualidade</p>
+                </div>
+                <img id="pdf-logo-img" class="pdf-logo" style="display:none;">
             </div>
-            <img id="pdf-logo-img" class="pdf-logo" style="display:none;">
-        </div>
-        
-        <div class="pdf-info-box">
-            <div><strong>Inspetor:</strong> <span id="p-inspector"></span></div>
-            <div><strong>Data:</strong> <span id="p-date"></span></div>
-            <div><strong>Cliente:</strong> <span id="p-client"></span></div>
-            <div><strong>Ref (SAC/NF):</strong> <span id="p-sac"></span></div>
+            <div class="pdf-info-box">
+                <div><strong>Inspetor:</strong> <span id="p-inspector"></span></div>
+                <div><strong>Data:</strong> <span id="p-date"></span></div>
+                <div><strong>Cliente:</strong> <span id="p-client"></span></div>
+                <div><strong>Ref (SAC/NF):</strong> <span id="p-sac"></span></div>
+            </div>
         </div>
 
-        <div class="pdf-dash-section">
+        <div id="pdf-block-dash" class="pdf-section pdf-dash-section">
             <h4 style="margin-top:0; border-bottom:1px solid #ccc; padding-bottom:5px;">Resumo Estatístico</h4>
             <div class="pdf-stats-row">
                 <div class="pdf-stat-box">
@@ -209,8 +213,20 @@
 
         <div id="pdf-items"></div>
         
-        <div style="margin-top: 40px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
-            Relatório gerado em <span id="p-footer-date"></span>
+        <div id="pdf-block-footer" class="pdf-section" style="margin-top: 20px;">
+            <div class="pdf-signature-container" style="display: flex; justify-content: space-between; margin-top: 40px;">
+                <div class="pdf-signature-item" style="text-align: center; width: 45%;">
+                    <div style="width: 100%; height: 1px; background: #333; margin-bottom: 5px;"></div>
+                    <p style="font-size: 12px; margin: 0;">Assinatura do Verificador</p>
+                </div>
+                <div class="pdf-signature-item" style="text-align: center; width: 45%;">
+                    <div style="width: 100%; height: 1px; background: #333; margin-bottom: 5px;"></div>
+                    <p style="font-size: 12px; margin: 0;">Assinatura do Aprovador / Engenharia</p>
+                </div>
+            </div>
+            <div style="text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px; margin-top: 40px;">
+                Relatório gerado em <span id="p-footer-date"></span> pelo Sistema de Inspeção v6.2
+            </div>
         </div>
     </div>
 
@@ -227,7 +243,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             updateTime();
             updateDatalist();
-            // CORREÇÃO: Inicializar gráficos ANTES de adicionar produto
             initCharts(); 
             addProduct();
             setInterval(updateTime, 60000);
@@ -258,7 +273,7 @@
                             <optgroup label="Elétrico / Eletrônico">
                                 <option value="Driver não acende (Inoperante)">Driver não acende (Inoperante)</option>
                                 <option value="Driver piscando ou oscilando">Driver piscando ou oscilando</option>
-                                <option value="Apagou durante o teste">Apagou durante o teste</option>
+                                <option value="Apagou durante o teste (Falha Térmica)">Apagou durante o teste (Falha Térmica)</option>
                                 <option value="Indício de surto no DPS (Falta Aterramento)">Indício de surto no DPS (Falta Aterramento)</option>
                                 <option value="LEDs queimados / Falha no Módulo">LEDs queimados / Falha no Módulo</option>
                             </optgroup>
@@ -418,7 +433,7 @@
                 }
             };
             reader.readAsArrayBuffer(file);
-            input.value = ''; // Reset input
+            input.value = ''; 
         }
 
         function updateDatalist() {
@@ -449,7 +464,7 @@
         }
 
         function updateDash() {
-            if (!chart1 || !chart2) return; // Proteção se os gráficos não estiverem prontos
+            if (!chart1 || !chart2) return;
 
             const total = appData.length;
             const yes = appData.filter(x => x.warranty === 'Sim').length;
@@ -470,7 +485,6 @@
         }
 
         function initCharts() {
-            // CORREÇÃO: animation: false garante que o gráfico renderize instantaneamente para o PDF
             chart1 = new Chart(document.getElementById('chart1'), {
                 type: 'doughnut',
                 data: { labels: ['Garantia','Sem Garantia'], datasets: [{ data: [0,0], backgroundColor: ['#27ae60','#c0392b'] }] },
@@ -483,7 +497,7 @@
             });
         }
 
-        // --- 6. PDF ---
+        // --- 6. PDF (CÓDIGO CORRIGIDO PARA NÃO CORTAR ELEMENTOS) ---
         function handleLogo(input) {
             const file = input.files[0];
             if(!file) return;
@@ -495,6 +509,26 @@
                 document.getElementById('headerLogoPlaceholder').style.display = 'none';
             };
             reader.readAsDataURL(file);
+        }
+
+        // Função auxiliar para injetar uma "foto" no PDF verificando quebra de página
+        async function addSectionToPDF(doc, domElement, currentY, margin, pageWidth, pageHeight) {
+            if (!domElement) return currentY;
+            
+            const canvas = await html2canvas(domElement, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            
+            const imgWidth = pageWidth - (margin * 2);
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            // Se a imagem for passar o final da folha, criar nova página
+            if (currentY + imgHeight > pageHeight - margin) {
+                doc.addPage();
+                currentY = margin;
+            }
+
+            doc.addImage(imgData, 'JPEG', margin, currentY, imgWidth, imgHeight);
+            return currentY + imgHeight + 5; // Retorna o novo Y com um espaçamento de 5mm
         }
 
         async function generatePDF() {
@@ -519,12 +553,10 @@
                 document.getElementById('pdf-st-total').innerText = document.getElementById('st-total').innerText;
                 document.getElementById('pdf-st-yes').innerText = document.getElementById('st-yes').innerText;
                 document.getElementById('pdf-st-no').innerText = document.getElementById('st-no').innerText;
-                
-                // Captura Gráficos como Imagem
                 document.getElementById('pdf-img-chart1').src = chart1.toBase64Image();
                 document.getElementById('pdf-img-chart2').src = chart2.toBase64Image();
 
-                // 3. Preenche Itens
+                // 3. Preenche Itens (HTML invisível)
                 const container = document.getElementById('pdf-items');
                 container.innerHTML = '';
                 
@@ -540,7 +572,7 @@
                     }
 
                     const html = `
-                        <div class="pdf-product">
+                        <div class="pdf-product pdf-section-item">
                             <div class="pdf-prod-header">
                                 <span>Item #${idx+1} - ${item.code || 'S/ Código'}</span>
                                 <span class="${statusClass}">${statusText}</span>
@@ -557,39 +589,39 @@
                     container.insertAdjacentHTML('beforeend', html);
                 });
 
-                // 4. Renderiza
+                // 4. Renderiza em Partes (Isso evita o corte no meio das caixas)
                 const element = document.getElementById('pdf-template');
                 element.style.display = 'block';
-                
-                // Tempo para o DOM atualizar a tela
-                await new Promise(r => setTimeout(r, 500)); 
+                await new Promise(r => setTimeout(r, 500)); // Tempo para atualizar layout
 
-                const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-                const imgData = canvas.toDataURL('image/jpeg', 0.9);
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF('p', 'mm', 'a4');
-                const imgWidth = 210; 
-                const pageHeight = 295;
-                const imgHeight = canvas.height * imgWidth / canvas.width;
-                let heightLeft = imgHeight;
-                let position = 0;
+                const margin = 10;
+                const pageWidth = 210; 
+                const pageHeight = 297;
+                let currentY = margin;
 
-                doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
+                // Tira print do bloco do Cabeçalho e adiciona
+                currentY = await addSectionToPDF(doc, document.getElementById('pdf-block-header'), currentY, margin, pageWidth, pageHeight);
                 
-                while (heightLeft >= 0) {
-                    position = heightLeft - imgHeight;
-                    doc.addPage();
-                    doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-                    heightLeft -= pageHeight;
+                // Tira print do bloco de Dashboard e adiciona
+                currentY = await addSectionToPDF(doc, document.getElementById('pdf-block-dash'), currentY, margin, pageWidth, pageHeight);
+
+                // Tira print individual de CADA produto (impede que um produto seja cortado ao meio)
+                const pdfProducts = document.querySelectorAll('.pdf-section-item');
+                for (let i = 0; i < pdfProducts.length; i++) {
+                    currentY = await addSectionToPDF(doc, pdfProducts[i], currentY, margin, pageWidth, pageHeight);
                 }
+
+                // Tira print do Rodapé (Assinaturas)
+                await addSectionToPDF(doc, document.getElementById('pdf-block-footer'), currentY, margin, pageWidth, pageHeight);
                 
                 doc.save(`Relatorio_SAC_${document.getElementById('sac').value || '000'}.pdf`);
                 
                 element.style.display = 'none';
             } catch(e) { 
                 console.error(e); 
-                alert('Erro ao gerar PDF. Detalhes no console.'); 
+                alert('Erro ao gerar PDF. Verifique o console.'); 
                 document.getElementById('pdf-template').style.display = 'none';
             } finally { 
                 btn.innerText = "📄 Baixar PDF"; 
