@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção v6.2 - Advanced Labs</title>
+    <title>Sistema de Inspeção v6.3 - Salvar/Carregar</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -19,6 +19,8 @@
             --success: #27ae60;
             --danger: #c0392b;
             --bg: #ecf0f1;
+            --warning: #f39c12;
+            --purple: #8e44ad;
         }
         
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; }
@@ -36,7 +38,8 @@
         
         /* IMPORT BAR */
         .import-bar { background: white; padding: 10px; display: flex; justify-content: center; gap: 15px; border-bottom: 1px solid #ddd; align-items: center; font-size: 14px; }
-        .btn-excel { background: #217346; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-excel { background: #217346; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; display: inline-block; margin: 5px; }
+        .btn-excel:hover { opacity: 0.9; }
         
         /* NAV */
         .nav-container { display: flex; justify-content: center; background: white; padding: 10px; margin-bottom: 20px; gap: 10px; }
@@ -71,10 +74,8 @@
 
         .fab { position: fixed; bottom: 25px; right: 25px; width: 55px; height: 55px; background: var(--success); color: white; border-radius: 50%; border: none; font-size: 28px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
 
-        /* PDF TEMPLATE (ESCONDIDO NA TELA) */
+        /* PDF TEMPLATE (ESCONDIDO) */
         #pdf-template { display: none; background: white; padding: 30px; width: 800px; margin: 0 auto; color: #333; }
-        
-        /* Ajustes para o PDF não cortar o fundo */
         .pdf-section { background: white; margin-bottom: 20px; } 
 
         .pdf-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px; background: white; }
@@ -114,7 +115,7 @@
             <div id="headerLogoPlaceholder" class="logo-placeholder">🏢</div>
             <div>
                 <h1 style="font-size: 18px; margin:0;">Sistema de Inspeção</h1>
-                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.2 - Quebra de Página Corrigida</p>
+                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.3 - Salvar/Carregar</p>
             </div>
         </div>
         <div style="text-align: right; font-size: 12px;">
@@ -126,9 +127,10 @@
 
     <div class="import-bar">
         <span>Base de Dados:</span>
-        <strong id="dbStatus" style="color: #e67e22;">Padrão (Exemplo)</strong>
+        <strong id="dbStatus" style="color: var(--warning);">Padrão (Exemplo)</strong>
         <button class="btn-excel" onclick="document.getElementById('excelInput').click()">📊 Importar Excel/CSV</button>
         <input type="file" id="excelInput" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleExcel(this)">
+        <input type="file" id="jsonInput" accept=".json" style="display: none;" onchange="loadJSON(this)">
     </div>
 
     <div class="nav-container">
@@ -150,9 +152,11 @@
             <div id="productList"></div>
 
             <div class="card" style="text-align: center;">
+                <button class="btn-excel" style="background:var(--purple);" onclick="saveJSON()">💾 Salvar Projeto</button>
+                <button class="btn-excel" style="background:var(--warning);" onclick="document.getElementById('jsonInput').click()">📁 Carregar Projeto</button>
                 <button class="btn-excel" style="background:var(--primary);" onclick="generatePDF()">📄 Baixar PDF</button>
-                <button class="btn-excel" style="background:var(--secondary); margin-left:10px;" onclick="fillTest()">🧪 Teste</button>
-                <button class="btn-excel" style="background:var(--danger); margin-left:10px;" onclick="resetAll()">🗑️ Limpar</button>
+                <button class="btn-excel" style="background:var(--secondary);" onclick="fillTest()">🧪 Teste</button>
+                <button class="btn-excel" style="background:var(--danger);" onclick="resetAll()">🗑️ Limpar</button>
             </div>
         </div>
 
@@ -225,7 +229,7 @@
                 </div>
             </div>
             <div style="text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px; margin-top: 40px;">
-                Relatório gerado em <span id="p-footer-date"></span> pelo Sistema de Inspeção v6.2
+                Relatório gerado em <span id="p-footer-date"></span> pelo Sistema de Inspeção
             </div>
         </div>
     </div>
@@ -262,7 +266,7 @@
                     <button class="remove-btn" onclick="removeItem('${id}')" title="Excluir Item">×</button>
                     <h4 class="item-title" style="margin-bottom:10px; color:var(--primary)">Carregando...</h4>
                     <div class="form-row">
-                        <div><label>Código</label><input type="text" list="dbList" class="form-control" onchange="checkCode(this, '${id}')" placeholder="Busca..."></div>
+                        <div><label>Código</label><input type="text" id="cod_${id}" list="dbList" class="form-control" onchange="checkCode(this, '${id}')" placeholder="Busca..."></div>
                         <div><label>Modelo</label><input type="text" id="mod_${id}" class="form-control" readonly style="background:#eee"></div>
                     </div>
                     
@@ -313,7 +317,7 @@
                             <option value="Sim">✅ Aprovado (Garantia)</option>
                             <option value="Não">❌ Reprovado (Sem Garantia)</option>
                         </select></div>
-                        <div><label>Observações</label><input type="text" class="form-control" onchange="updateData('${id}','obs',this.value)"></div>
+                        <div><label>Observações</label><input type="text" id="obs_${id}" class="form-control" onchange="updateData('${id}','obs',this.value)"></div>
                     </div>
                     
                     <div class="image-upload-area">
@@ -351,7 +355,8 @@
                 updateData(id, 'code', input.value);
                 updateData(id, 'model', found.model);
             } else {
-                input.value = ''; mod.value = ''; alert('Código não encontrado.');
+                updateData(id, 'code', input.value); // Salva o que foi digitado mesmo sem estar na base
+                mod.value = ''; 
             }
         }
 
@@ -497,7 +502,120 @@
             });
         }
 
-        // --- 6. PDF (CÓDIGO CORRIGIDO PARA NÃO CORTAR ELEMENTOS) ---
+        // --- 6. SALVAR E CARREGAR PROJETO (JSON) ---
+        function syncDOMtoData() {
+            // Garante que o que está na tela está no appData antes de salvar
+            appData.forEach(item => {
+                const codeInput = document.getElementById(`cod_${item.id}`);
+                if(codeInput) item.code = codeInput.value;
+                const modInput = document.getElementById(`mod_${item.id}`);
+                if(modInput) item.model = modInput.value;
+                const defInput = document.getElementById(`def_${item.id}`);
+                if(defInput) item.defect = defInput.value;
+                const cauInput = document.getElementById(`cau_${item.id}`);
+                if(cauInput) item.cause = cauInput.value;
+                const warInput = document.getElementById(`war_${item.id}`);
+                if(warInput) item.warranty = warInput.value;
+                const obsInput = document.getElementById(`obs_${item.id}`);
+                if(obsInput) item.obs = obsInput.value;
+            });
+        }
+
+        function saveJSON() {
+            syncDOMtoData();
+            const exportData = {
+                header: {
+                    inspector: document.getElementById('inspector').value,
+                    client: document.getElementById('client').value,
+                    sac: document.getElementById('sac').value
+                },
+                logo: companyLogoBase64,
+                products: appData
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Inspecao_${document.getElementById('sac').value || 'Projeto'}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function loadJSON(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    
+                    // Restaurar Cabeçalho
+                    if(importedData.header) {
+                        document.getElementById('inspector').value = importedData.header.inspector || '';
+                        document.getElementById('client').value = importedData.header.client || '';
+                        document.getElementById('sac').value = importedData.header.sac || '';
+                    }
+
+                    // Restaurar Logo
+                    if(importedData.logo) {
+                        companyLogoBase64 = importedData.logo;
+                        document.getElementById('headerLogo').src = companyLogoBase64;
+                        document.getElementById('headerLogo').style.display = 'block';
+                        document.getElementById('headerLogoPlaceholder').style.display = 'none';
+                    }
+
+                    // Restaurar Produtos
+                    if(importedData.products && Array.isArray(importedData.products)) {
+                        document.getElementById('productList').innerHTML = '';
+                        appData = [];
+                        
+                        importedData.products.forEach(p => {
+                            addProduct();
+                            const newItem = appData[appData.length - 1]; 
+                            const id = newItem.id;
+                            
+                            document.getElementById(`cod_${id}`).value = p.code || '';
+                            document.getElementById(`mod_${id}`).value = p.model || '';
+                            document.getElementById(`def_${id}`).value = p.defect || '';
+                            document.getElementById(`cau_${id}`).value = p.cause || '';
+                            document.getElementById(`war_${id}`).value = p.warranty || '';
+                            document.getElementById(`obs_${id}`).value = p.obs || '';
+
+                            // Restaurar Imagens no HTML
+                            newItem.images = p.images || [];
+                            const container = document.getElementById(`imgs_${id}`);
+                            newItem.images.forEach(imgData => {
+                                const img = document.createElement('img');
+                                img.src = imgData;
+                                img.className = 'img-thumb';
+                                img.onclick = function() { const w=window.open(""); w.document.write(`<img src="${this.src}" style="max-width:100%">`); };
+                                container.appendChild(img);
+                            });
+
+                            // Atualizar objeto
+                            newItem.code = p.code || '';
+                            newItem.model = p.model || '';
+                            newItem.defect = p.defect || '';
+                            newItem.cause = p.cause || '';
+                            newItem.warranty = p.warranty || '';
+                            newItem.obs = p.obs || '';
+                        });
+                        updateDash();
+                    }
+                    alert('Projeto carregado com sucesso!');
+                } catch(err) {
+                    console.error(err);
+                    alert('Erro ao carregar o arquivo JSON.');
+                }
+            };
+            reader.readAsText(file);
+            input.value = '';
+        }
+
+        // --- 7. PDF ---
         function handleLogo(input) {
             const file = input.files[0];
             if(!file) return;
@@ -511,33 +629,27 @@
             reader.readAsDataURL(file);
         }
 
-        // Função auxiliar para injetar uma "foto" no PDF verificando quebra de página
         async function addSectionToPDF(doc, domElement, currentY, margin, pageWidth, pageHeight) {
             if (!domElement) return currentY;
-            
             const canvas = await html2canvas(domElement, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
             const imgData = canvas.toDataURL('image/jpeg', 0.95);
-            
             const imgWidth = pageWidth - (margin * 2);
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-            // Se a imagem for passar o final da folha, criar nova página
             if (currentY + imgHeight > pageHeight - margin) {
                 doc.addPage();
                 currentY = margin;
             }
-
             doc.addImage(imgData, 'JPEG', margin, currentY, imgWidth, imgHeight);
-            return currentY + imgHeight + 5; // Retorna o novo Y com um espaçamento de 5mm
+            return currentY + imgHeight + 5; 
         }
 
         async function generatePDF() {
             const btn = document.querySelector('button[onclick="generatePDF()"]');
             btn.innerText = "⏳ Gerando...";
             btn.disabled = true;
+            syncDOMtoData();
             
             try {
-                // 1. Preenche Cabeçalho
                 document.getElementById('p-inspector').innerText = document.getElementById('inspector').value || '-';
                 document.getElementById('p-client').innerText = document.getElementById('client').value || '-';
                 document.getElementById('p-sac').innerText = document.getElementById('sac').value || '-';
@@ -549,14 +661,12 @@
                     document.getElementById('pdf-logo-img').style.display = 'block';
                 }
 
-                // 2. Preenche Dashboard no PDF
                 document.getElementById('pdf-st-total').innerText = document.getElementById('st-total').innerText;
                 document.getElementById('pdf-st-yes').innerText = document.getElementById('st-yes').innerText;
                 document.getElementById('pdf-st-no').innerText = document.getElementById('st-no').innerText;
                 document.getElementById('pdf-img-chart1').src = chart1.toBase64Image();
                 document.getElementById('pdf-img-chart2').src = chart2.toBase64Image();
 
-                // 3. Preenche Itens (HTML invisível)
                 const container = document.getElementById('pdf-items');
                 container.innerHTML = '';
                 
@@ -589,10 +699,9 @@
                     container.insertAdjacentHTML('beforeend', html);
                 });
 
-                // 4. Renderiza em Partes (Isso evita o corte no meio das caixas)
                 const element = document.getElementById('pdf-template');
                 element.style.display = 'block';
-                await new Promise(r => setTimeout(r, 500)); // Tempo para atualizar layout
+                await new Promise(r => setTimeout(r, 500));
 
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF('p', 'mm', 'a4');
@@ -601,23 +710,17 @@
                 const pageHeight = 297;
                 let currentY = margin;
 
-                // Tira print do bloco do Cabeçalho e adiciona
                 currentY = await addSectionToPDF(doc, document.getElementById('pdf-block-header'), currentY, margin, pageWidth, pageHeight);
-                
-                // Tira print do bloco de Dashboard e adiciona
                 currentY = await addSectionToPDF(doc, document.getElementById('pdf-block-dash'), currentY, margin, pageWidth, pageHeight);
 
-                // Tira print individual de CADA produto (impede que um produto seja cortado ao meio)
                 const pdfProducts = document.querySelectorAll('.pdf-section-item');
                 for (let i = 0; i < pdfProducts.length; i++) {
                     currentY = await addSectionToPDF(doc, pdfProducts[i], currentY, margin, pageWidth, pageHeight);
                 }
 
-                // Tira print do Rodapé (Assinaturas)
                 await addSectionToPDF(doc, document.getElementById('pdf-block-footer'), currentY, margin, pageWidth, pageHeight);
                 
                 doc.save(`Relatorio_SAC_${document.getElementById('sac').value || '000'}.pdf`);
-                
                 element.style.display = 'none';
             } catch(e) { 
                 console.error(e); 
@@ -629,14 +732,13 @@
             }
         }
 
-        // Utils
         function fillTest() {
             document.getElementById('inspector').value = "Técnico Silva";
             document.getElementById('client').value = "Prefeitura Modelo";
             document.getElementById('sac').value = "SAC-999";
             if(dbProducts.length > 0) {
                 const id = appData[0].id;
-                const inp = document.querySelector(`#div_${id} input[list]`);
+                const inp = document.getElementById(`cod_${id}`);
                 inp.value = dbProducts[0].code;
                 checkCode(inp, id);
                 document.getElementById(`war_${id}`).value = "Sim";
