@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção v6.4 - Advanced Labs</title>
+    <title>Sistema de Inspeção v6.5 - Advanced Labs</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -64,7 +64,7 @@
         .image-upload-area { margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px; }
         .images-grid { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
         
-        /* NOVO: Estilos para gerenciar as fotos */
+        /* FOTOS */
         .img-wrapper { position: relative; display: inline-block; }
         .img-thumb { width: 70px; height: 70px; object-fit: cover; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: transform 0.2s; }
         .img-thumb:hover { transform: scale(1.05); border-color: var(--primary); }
@@ -84,7 +84,7 @@
 
         .fab { position: fixed; bottom: 25px; right: 25px; width: 55px; height: 55px; background: var(--success); color: white; border-radius: 50%; border: none; font-size: 28px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
 
-        /* PDF TEMPLATE (ESCONDIDO) */
+        /* PDF TEMPLATE */
         #pdf-template { display: none; background: white; padding: 30px; width: 800px; margin: 0 auto; color: #333; }
         .pdf-section { background: white; margin-bottom: 20px; } 
 
@@ -97,8 +97,8 @@
         .pdf-dash-section { border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: white; }
         .pdf-stats-row { display: flex; justify-content: space-between; margin-bottom: 15px; text-align: center; }
         .pdf-stat-box { background: #eee; padding: 10px; width: 30%; border-radius: 4px; }
-        .pdf-charts-row { display: flex; justify-content: space-between; align-items: center; }
-        .pdf-chart-img { width: 48%; height: auto; border: 1px solid #eee; }
+        .pdf-charts-row { display: flex; justify-content: space-between; align-items: center; gap: 5px; }
+        .pdf-chart-img { width: 32%; height: auto; border: 1px solid #eee; border-radius: 4px; }
 
         /* Estilo do Item no PDF */
         .pdf-product { border: 1px solid #ccc; margin-bottom: 15px; background: white; border-radius: 4px; overflow: hidden;}
@@ -125,7 +125,7 @@
             <div id="headerLogoPlaceholder" class="logo-placeholder">🏢</div>
             <div>
                 <h1 style="font-size: 18px; margin:0;">Sistema de Inspeção</h1>
-                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.4 - Exclusão de Fotos</p>
+                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.5 - Lotes e Datas de Fabricação</p>
             </div>
         </div>
         <div style="text-align: right; font-size: 12px;">
@@ -176,9 +176,10 @@
                 <div class="stat-card"><small>Com Garantia</small><div class="stat-val" style="color:var(--success)" id="st-yes">0</div></div>
                 <div class="stat-card"><small>Sem Garantia</small><div class="stat-val" style="color:var(--danger)" id="st-no">0</div></div>
             </div>
-            <div class="form-row">
+            <div class="form-row" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
                 <div class="chart-box"><canvas id="chart1"></canvas></div>
                 <div class="chart-box"><canvas id="chart2"></canvas></div>
+                <div class="chart-box"><canvas id="chart3"></canvas></div>
             </div>
         </div>
     </div>
@@ -222,6 +223,7 @@
             <div class="pdf-charts-row">
                 <img id="pdf-img-chart1" class="pdf-chart-img">
                 <img id="pdf-img-chart2" class="pdf-chart-img">
+                <img id="pdf-img-chart3" class="pdf-chart-img">
             </div>
         </div>
 
@@ -252,7 +254,7 @@
         ];
         let appData = [];
         let companyLogoBase64 = null;
-        let chart1, chart2;
+        let chart1, chart2, chart3;
 
         document.addEventListener('DOMContentLoaded', () => {
             updateTime();
@@ -280,6 +282,13 @@
                         <div><label>Modelo</label><input type="text" id="mod_${id}" class="form-control" readonly style="background:#eee"></div>
                     </div>
                     
+                    <div class="form-row">
+                        <div><label>Número de Série</label>
+                        <input type="text" id="sn_${id}" class="form-control" placeholder="Ex: NS_113" onchange="updateData('${id}','serialNumber',this.value)"></div>
+                        <div><label>Data de Fabricação (Lote)</label>
+                        <input type="date" id="fab_${id}" class="form-control" onchange="updateData('${id}','purchaseDate',this.value)"></div>
+                    </div>
+
                     <div class="form-row">
                         <div><label>Defeito Identificado (Padrão SAC)</label>
                         <select id="def_${id}" class="form-control" onchange="updateData('${id}','defect',this.value)">
@@ -338,7 +347,7 @@
                 </div>
             `;
             document.getElementById('productList').insertAdjacentHTML('beforeend', html);
-            appData.push({ id: id, code: '', model: '', warranty: '', defect: '', cause: '', obs: '', images: [] });
+            appData.push({ id: id, code: '', model: '', serialNumber: '', purchaseDate: '', warranty: '', defect: '', cause: '', obs: '', images: [] });
             updateProductNumbers();
         }
 
@@ -365,7 +374,7 @@
                 updateData(id, 'code', input.value);
                 updateData(id, 'model', found.model);
             } else {
-                updateData(id, 'code', input.value); // Salva o que foi digitado mesmo sem estar na base
+                updateData(id, 'code', input.value); 
                 mod.value = ''; 
             }
         }
@@ -374,7 +383,7 @@
             const item = appData.find(x => x.id === id);
             if(item) {
                 item[field] = val;
-                if(field === 'warranty' || field === 'cause') updateDash();
+                if(field === 'warranty' || field === 'cause' || field === 'purchaseDate') updateDash();
             }
         }
 
@@ -388,22 +397,20 @@
                 item.images.push(compressed);
             }
             
-            input.value = ''; // Reseta o input para permitir enviar a mesma imagem novamente se precisar
-            renderImages(id); // Chama a função para desenhar as imagens na tela
+            input.value = ''; 
+            renderImages(id); 
         }
 
-        // NOVO: Função centralizada para desenhar as imagens na tela com o botão de excluir
         function renderImages(id) {
             const container = document.getElementById(`imgs_${id}`);
             const item = appData.find(x => x.id === id);
             
-            container.innerHTML = ''; // Limpa antes de desenhar
+            container.innerHTML = ''; 
             
             item.images.forEach((imgData, index) => {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'img-wrapper';
                 
-                // Imagem
                 const img = document.createElement('img');
                 img.src = imgData;
                 img.className = 'img-thumb';
@@ -412,13 +419,12 @@
                     w.document.write(`<img src="${this.src}" style="max-width:100%">`); 
                 };
                 
-                // Botão de excluir ("X")
                 const delBtn = document.createElement('button');
                 delBtn.className = 'img-delete';
                 delBtn.innerHTML = '×';
                 delBtn.title = 'Remover foto';
                 delBtn.onclick = function(e) {
-                    e.stopPropagation(); // Evita que abra a imagem ao clicar no X
+                    e.stopPropagation(); 
                     removeImage(id, index);
                 };
                 
@@ -428,12 +434,11 @@
             });
         }
 
-        // NOVO: Função para excluir uma imagem específica do array e da tela
         function removeImage(id, imgIndex) {
             if(confirm('Tem certeza que deseja remover esta foto?')) {
                 const item = appData.find(x => x.id === id);
-                item.images.splice(imgIndex, 1); // Remove da memória
-                renderImages(id); // Re-desenha a tela atualizada
+                item.images.splice(imgIndex, 1); 
+                renderImages(id); 
             }
         }
 
@@ -522,7 +527,7 @@
         }
 
         function updateDash() {
-            if (!chart1 || !chart2) return;
+            if (!chart1 || !chart2 || !chart3) return;
 
             const total = appData.length;
             const yes = appData.filter(x => x.warranty === 'Sim').length;
@@ -532,14 +537,46 @@
             document.getElementById('st-yes').innerText = yes;
             document.getElementById('st-no').innerText = no;
 
+            // Gráfico 1: Garantia
             chart1.data.datasets[0].data = [yes, no];
             chart1.update();
 
+            // Gráfico 2: Causas
             const causes = {};
             appData.forEach(i => { if(i.cause) causes[i.cause] = (causes[i.cause]||0)+1; });
             chart2.data.labels = Object.keys(causes);
             chart2.data.datasets[0].data = Object.values(causes);
             chart2.update();
+
+            // Gráfico 3: Datas de Fabricação (Agrupadas por Mês/Ano)
+            const rawDates = {};
+            appData.forEach(i => {
+                if(i.purchaseDate) {
+                    const ym = i.purchaseDate.substring(0, 7); // Ex: "2024-03"
+                    rawDates[ym] = (rawDates[ym] || 0) + 1;
+                } else {
+                    rawDates['Não Informada'] = (rawDates['Não Informada'] || 0) + 1;
+                }
+            });
+
+            const labels = [];
+            const data = [];
+            const validKeys = Object.keys(rawDates).filter(k => k !== 'Não Informada').sort();
+            
+            validKeys.forEach(k => {
+                const parts = k.split('-');
+                labels.push(`${parts[1]}/${parts[0]}`); // Formatando para "03/2024"
+                data.push(rawDates[k]);
+            });
+
+            if (rawDates['Não Informada']) {
+                labels.push('Não Informada');
+                data.push(rawDates['Não Informada']);
+            }
+
+            chart3.data.labels = labels;
+            chart3.data.datasets[0].data = data;
+            chart3.update();
         }
 
         function initCharts() {
@@ -553,6 +590,12 @@
                 data: { labels: [], datasets: [{ label:'Qtd', data: [], backgroundColor:'#2980b9' }] },
                 options: { animation: false, maintainAspectRatio: false, plugins: { title: {display:true, text:'Categorias de Causas'}, legend: {display:false} } }
             });
+            // NOVO GRÁFICO 3 (Lotes de Fabricação)
+            chart3 = new Chart(document.getElementById('chart3'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label:'Peças com Defeito', data: [], borderColor:'#8e44ad', backgroundColor:'rgba(142, 68, 173, 0.2)', fill: true, tension: 0.3 }] },
+                options: { animation: false, maintainAspectRatio: false, plugins: { title: {display:true, text:'Lotes de Fabricação c/ Falha'}, legend: {display:false} }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
         }
 
         // --- 6. SALVAR E CARREGAR PROJETO (JSON) ---
@@ -562,6 +605,10 @@
                 if(codeInput) item.code = codeInput.value;
                 const modInput = document.getElementById(`mod_${item.id}`);
                 if(modInput) item.model = modInput.value;
+                const snInput = document.getElementById(`sn_${item.id}`);
+                if(snInput) item.serialNumber = snInput.value;
+                const fabInput = document.getElementById(`fab_${item.id}`);
+                if(fabInput) item.purchaseDate = fabInput.value;
                 const defInput = document.getElementById(`def_${item.id}`);
                 if(defInput) item.defect = defInput.value;
                 const cauInput = document.getElementById(`cau_${item.id}`);
@@ -604,14 +651,12 @@
                 try {
                     const importedData = JSON.parse(e.target.result);
                     
-                    // Restaurar Cabeçalho
                     if(importedData.header) {
                         document.getElementById('inspector').value = importedData.header.inspector || '';
                         document.getElementById('client').value = importedData.header.client || '';
                         document.getElementById('sac').value = importedData.header.sac || '';
                     }
 
-                    // Restaurar Logo
                     if(importedData.logo) {
                         companyLogoBase64 = importedData.logo;
                         document.getElementById('headerLogo').src = companyLogoBase64;
@@ -619,7 +664,6 @@
                         document.getElementById('headerLogoPlaceholder').style.display = 'none';
                     }
 
-                    // Restaurar Produtos
                     if(importedData.products && Array.isArray(importedData.products)) {
                         document.getElementById('productList').innerHTML = '';
                         appData = [];
@@ -631,15 +675,18 @@
                             
                             document.getElementById(`cod_${id}`).value = p.code || '';
                             document.getElementById(`mod_${id}`).value = p.model || '';
+                            document.getElementById(`sn_${id}`).value = p.serialNumber || '';
+                            document.getElementById(`fab_${id}`).value = p.purchaseDate || '';
                             document.getElementById(`def_${id}`).value = p.defect || '';
                             document.getElementById(`cau_${id}`).value = p.cause || '';
                             document.getElementById(`war_${id}`).value = p.warranty || '';
                             document.getElementById(`obs_${id}`).value = p.obs || '';
 
-                            // Atualizar objeto com imagens e chamar o render
                             newItem.images = p.images || [];
                             newItem.code = p.code || '';
                             newItem.model = p.model || '';
+                            newItem.serialNumber = p.serialNumber || '';
+                            newItem.purchaseDate = p.purchaseDate || '';
                             newItem.defect = p.defect || '';
                             newItem.cause = p.cause || '';
                             newItem.warranty = p.warranty || '';
@@ -710,6 +757,7 @@
                 document.getElementById('pdf-st-no').innerText = document.getElementById('st-no').innerText;
                 document.getElementById('pdf-img-chart1').src = chart1.toBase64Image();
                 document.getElementById('pdf-img-chart2').src = chart2.toBase64Image();
+                document.getElementById('pdf-img-chart3').src = chart3.toBase64Image();
 
                 const container = document.getElementById('pdf-items');
                 container.innerHTML = '';
@@ -724,6 +772,8 @@
                     if(item.images.length > 0) {
                         imagesHTML = `<div class="pdf-imgs">${item.images.map(src => `<img src="${src}" class="pdf-img">`).join('')}</div>`;
                     }
+                    
+                    const dtFab = item.purchaseDate ? moment(item.purchaseDate).format('L') : '-';
 
                     const html = `
                         <div class="pdf-product pdf-section-item">
@@ -733,6 +783,8 @@
                             </div>
                             <div class="pdf-prod-body">
                                 <div class="pdf-row"><span class="pdf-lbl">Modelo:</span> <span class="pdf-val">${item.model || '-'}</span></div>
+                                <div class="pdf-row"><span class="pdf-lbl">Nº Série:</span> <span class="pdf-val">${item.serialNumber || '-'}</span></div>
+                                <div class="pdf-row"><span class="pdf-lbl">Fabricação:</span> <span class="pdf-val">${dtFab}</span></div>
                                 <div class="pdf-row"><span class="pdf-lbl">Defeito:</span> <span class="pdf-val">${item.defect || '-'}</span></div>
                                 <div class="pdf-row"><span class="pdf-lbl">Causa:</span> <span class="pdf-val">${item.cause || '-'}</span></div>
                                 <div class="pdf-row"><span class="pdf-lbl">Obs:</span> <span class="pdf-val">${item.obs || '-'}</span></div>
@@ -782,9 +834,16 @@
             document.getElementById('sac').value = "SAC-999";
             if(dbProducts.length > 0) {
                 const id = appData[0].id;
-                const inp = document.getElementById(`cod_${id}`);
-                inp.value = dbProducts[0].code;
-                checkCode(inp, id);
+                
+                document.getElementById(`cod_${id}`).value = dbProducts[0].code;
+                checkCode(document.getElementById(`cod_${id}`), id);
+                
+                document.getElementById(`sn_${id}`).value = "NS_450";
+                updateData(id,'serialNumber',"NS_450");
+                
+                document.getElementById(`fab_${id}`).value = "2024-03-15";
+                updateData(id,'purchaseDate',"2024-03-15");
+                
                 document.getElementById(`war_${id}`).value = "Sim";
                 updateData(id,'warranty','Sim');
                 
