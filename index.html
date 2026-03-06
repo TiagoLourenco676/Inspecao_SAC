@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção v6.3 - Salvar/Carregar</title>
+    <title>Sistema de Inspeção v6.4 - Advanced Labs</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -63,8 +63,18 @@
         
         .image-upload-area { margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px; }
         .images-grid { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+        
+        /* NOVO: Estilos para gerenciar as fotos */
+        .img-wrapper { position: relative; display: inline-block; }
         .img-thumb { width: 70px; height: 70px; object-fit: cover; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: transform 0.2s; }
-        .img-thumb:hover { transform: scale(1.1); border-color: var(--primary); }
+        .img-thumb:hover { transform: scale(1.05); border-color: var(--primary); }
+        .img-delete {
+            position: absolute; top: -5px; right: -5px; background: var(--danger); color: white;
+            border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: transform 0.2s;
+        }
+        .img-delete:hover { transform: scale(1.1); }
 
         /* DASHBOARD */
         .dash-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
@@ -115,7 +125,7 @@
             <div id="headerLogoPlaceholder" class="logo-placeholder">🏢</div>
             <div>
                 <h1 style="font-size: 18px; margin:0;">Sistema de Inspeção</h1>
-                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.3 - Salvar/Carregar</p>
+                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.4 - Exclusão de Fotos</p>
             </div>
         </div>
         <div style="text-align: right; font-size: 12px;">
@@ -334,7 +344,7 @@
 
         function removeItem(id) {
             if(appData.length <= 1) { alert('Mínimo 1 item.'); return; }
-            if(confirm('Excluir item?')) {
+            if(confirm('Excluir este item completo?')) {
                 document.getElementById(`div_${id}`).remove();
                 appData = appData.filter(x => x.id !== id);
                 updateProductNumbers();
@@ -372,15 +382,58 @@
         async function handleImages(input, id) {
             const files = Array.from(input.files);
             const item = appData.find(x => x.id === id);
-            const container = document.getElementById(`imgs_${id}`);
+            
             for(const file of files) {
                 const compressed = await compressImage(file);
                 item.images.push(compressed);
+            }
+            
+            input.value = ''; // Reseta o input para permitir enviar a mesma imagem novamente se precisar
+            renderImages(id); // Chama a função para desenhar as imagens na tela
+        }
+
+        // NOVO: Função centralizada para desenhar as imagens na tela com o botão de excluir
+        function renderImages(id) {
+            const container = document.getElementById(`imgs_${id}`);
+            const item = appData.find(x => x.id === id);
+            
+            container.innerHTML = ''; // Limpa antes de desenhar
+            
+            item.images.forEach((imgData, index) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'img-wrapper';
+                
+                // Imagem
                 const img = document.createElement('img');
-                img.src = compressed;
+                img.src = imgData;
                 img.className = 'img-thumb';
-                img.onclick = function() { const w=window.open(""); w.document.write(`<img src="${this.src}" style="max-width:100%">`); };
-                container.appendChild(img);
+                img.onclick = function() { 
+                    const w = window.open(""); 
+                    w.document.write(`<img src="${this.src}" style="max-width:100%">`); 
+                };
+                
+                // Botão de excluir ("X")
+                const delBtn = document.createElement('button');
+                delBtn.className = 'img-delete';
+                delBtn.innerHTML = '×';
+                delBtn.title = 'Remover foto';
+                delBtn.onclick = function(e) {
+                    e.stopPropagation(); // Evita que abra a imagem ao clicar no X
+                    removeImage(id, index);
+                };
+                
+                wrapper.appendChild(img);
+                wrapper.appendChild(delBtn);
+                container.appendChild(wrapper);
+            });
+        }
+
+        // NOVO: Função para excluir uma imagem específica do array e da tela
+        function removeImage(id, imgIndex) {
+            if(confirm('Tem certeza que deseja remover esta foto?')) {
+                const item = appData.find(x => x.id === id);
+                item.images.splice(imgIndex, 1); // Remove da memória
+                renderImages(id); // Re-desenha a tela atualizada
             }
         }
 
@@ -504,7 +557,6 @@
 
         // --- 6. SALVAR E CARREGAR PROJETO (JSON) ---
         function syncDOMtoData() {
-            // Garante que o que está na tela está no appData antes de salvar
             appData.forEach(item => {
                 const codeInput = document.getElementById(`cod_${item.id}`);
                 if(codeInput) item.code = codeInput.value;
@@ -584,24 +636,16 @@
                             document.getElementById(`war_${id}`).value = p.warranty || '';
                             document.getElementById(`obs_${id}`).value = p.obs || '';
 
-                            // Restaurar Imagens no HTML
+                            // Atualizar objeto com imagens e chamar o render
                             newItem.images = p.images || [];
-                            const container = document.getElementById(`imgs_${id}`);
-                            newItem.images.forEach(imgData => {
-                                const img = document.createElement('img');
-                                img.src = imgData;
-                                img.className = 'img-thumb';
-                                img.onclick = function() { const w=window.open(""); w.document.write(`<img src="${this.src}" style="max-width:100%">`); };
-                                container.appendChild(img);
-                            });
-
-                            // Atualizar objeto
                             newItem.code = p.code || '';
                             newItem.model = p.model || '';
                             newItem.defect = p.defect || '';
                             newItem.cause = p.cause || '';
                             newItem.warranty = p.warranty || '';
                             newItem.obs = p.obs || '';
+                            
+                            renderImages(id);
                         });
                         updateDash();
                     }
