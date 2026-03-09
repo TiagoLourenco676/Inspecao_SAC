@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção v6.5 - Advanced Labs</title>
+    <title>Sistema de Inspeção v6.6 - Advanced Labs</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -125,7 +125,7 @@
             <div id="headerLogoPlaceholder" class="logo-placeholder">🏢</div>
             <div>
                 <h1 style="font-size: 18px; margin:0;">Sistema de Inspeção</h1>
-                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.5 - Lotes e Datas de Fabricação</p>
+                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.6 - Auto-Save e Alerta de Saída</p>
             </div>
         </div>
         <div style="text-align: right; font-size: 12px;">
@@ -165,7 +165,6 @@
                 <button class="btn-excel" style="background:var(--purple);" onclick="saveJSON()">💾 Salvar Projeto</button>
                 <button class="btn-excel" style="background:var(--warning);" onclick="document.getElementById('jsonInput').click()">📁 Carregar Projeto</button>
                 <button class="btn-excel" style="background:var(--primary);" onclick="generatePDF()">📄 Baixar PDF</button>
-                <button class="btn-excel" style="background:var(--secondary);" onclick="fillTest()">🧪 Teste</button>
                 <button class="btn-excel" style="background:var(--danger);" onclick="resetAll()">🗑️ Limpar</button>
             </div>
         </div>
@@ -260,7 +259,15 @@
             updateTime();
             updateDatalist();
             initCharts(); 
-            addProduct();
+            
+            // Aguarda um instante para evitar bloqueios do navegador no aviso de restaurar
+            setTimeout(() => {
+                const isRecovered = checkBackup();
+                if (!isRecovered && appData.length === 0) {
+                    addProduct();
+                }
+            }, 300);
+
             setInterval(updateTime, 60000);
         });
 
@@ -268,6 +275,64 @@
             const now = moment();
             document.getElementById('clockDate').innerText = now.format('L');
             document.getElementById('clockTime').innerText = now.format('LT');
+        }
+
+        // --- 8. PREVENÇÃO DE PERDA DE DADOS (AUTO-SAVE & ALERTAS) ---
+        
+        // 8.1 Evita fechar a página por acidente
+        window.addEventListener('beforeunload', function (e) {
+            const hasInfo = appData.length > 0 || 
+                            document.getElementById('inspector').value !== '' || 
+                            document.getElementById('client').value !== '' || 
+                            document.getElementById('sac').value !== '';
+            
+            if (hasInfo) {
+                e.preventDefault();
+                e.returnValue = ''; // Exige confirmação nativa do navegador
+            }
+        });
+
+        // 8.2 Salva automaticamente a cada 10 segundos
+        setInterval(() => {
+            try {
+                if (appData.length === 0 && !document.getElementById('inspector').value) return; // Não salva vazio
+                syncDOMtoData();
+                const exportData = {
+                    header: {
+                        inspector: document.getElementById('inspector').value,
+                        client: document.getElementById('client').value,
+                        sac: document.getElementById('sac').value
+                    },
+                    logo: companyLogoBase64,
+                    products: appData
+                };
+                localStorage.setItem('inspecao_backup_v6', JSON.stringify(exportData));
+            } catch (error) {
+                console.warn('Backup pausado. Causa comum: muitas fotos excederam limite do navegador.');
+            }
+        }, 10000);
+
+        // 8.3 Recupera dados da última sessão
+        function checkBackup() {
+            const backup = localStorage.getItem('inspecao_backup_v6');
+            if (backup) {
+                try {
+                    const data = JSON.parse(backup);
+                    const temConteudo = (data.products && data.products.length > 0) || data.header.inspector || data.header.client;
+                    
+                    if (temConteudo) {
+                        if (confirm('⚠️ Encontramos dados preenchidos que não foram salvos na sua última sessão.\n\nDeseja recuperar esses dados?')) {
+                            restoreData(data);
+                            return true;
+                        } else {
+                            localStorage.removeItem('inspecao_backup_v6');
+                        }
+                    }
+                } catch(e) {
+                    console.error('Erro ao ler backup local:', e);
+                }
+            }
+            return false;
         }
 
         // --- 2. LÓGICA DE PRODUTOS ---
@@ -352,7 +417,6 @@
         }
 
         function removeItem(id) {
-            if(appData.length <= 1) { alert('Mínimo 1 item.'); return; }
             if(confirm('Excluir este item completo?')) {
                 document.getElementById(`div_${id}`).remove();
                 appData = appData.filter(x => x.id !== id);
@@ -552,7 +616,7 @@
             const rawDates = {};
             appData.forEach(i => {
                 if(i.purchaseDate) {
-                    const ym = i.purchaseDate.substring(0, 7); // Ex: "2024-03"
+                    const ym = i.purchaseDate.substring(0, 7);
                     rawDates[ym] = (rawDates[ym] || 0) + 1;
                 } else {
                     rawDates['Não Informada'] = (rawDates['Não Informada'] || 0) + 1;
@@ -565,7 +629,7 @@
             
             validKeys.forEach(k => {
                 const parts = k.split('-');
-                labels.push(`${parts[1]}/${parts[0]}`); // Formatando para "03/2024"
+                labels.push(`${parts[1]}/${parts[0]}`);
                 data.push(rawDates[k]);
             });
 
@@ -590,7 +654,6 @@
                 data: { labels: [], datasets: [{ label:'Qtd', data: [], backgroundColor:'#2980b9' }] },
                 options: { animation: false, maintainAspectRatio: false, plugins: { title: {display:true, text:'Categorias de Causas'}, legend: {display:false} } }
             });
-            // NOVO GRÁFICO 3 (Lotes de Fabricação)
             chart3 = new Chart(document.getElementById('chart3'), {
                 type: 'line',
                 data: { labels: [], datasets: [{ label:'Peças com Defeito', data: [], borderColor:'#8e44ad', backgroundColor:'rgba(142, 68, 173, 0.2)', fill: true, tension: 0.3 }] },
@@ -598,7 +661,7 @@
             });
         }
 
-        // --- 6. SALVAR E CARREGAR PROJETO (JSON) ---
+        // --- 6. SALVAR E CARREGAR PROJETO ---
         function syncDOMtoData() {
             appData.forEach(item => {
                 const codeInput = document.getElementById(`cod_${item.id}`);
@@ -618,6 +681,54 @@
                 const obsInput = document.getElementById(`obs_${item.id}`);
                 if(obsInput) item.obs = obsInput.value;
             });
+        }
+
+        function restoreData(importedData) {
+            if(importedData.header) {
+                document.getElementById('inspector').value = importedData.header.inspector || '';
+                document.getElementById('client').value = importedData.header.client || '';
+                document.getElementById('sac').value = importedData.header.sac || '';
+            }
+
+            if(importedData.logo) {
+                companyLogoBase64 = importedData.logo;
+                document.getElementById('headerLogo').src = companyLogoBase64;
+                document.getElementById('headerLogo').style.display = 'block';
+                document.getElementById('headerLogoPlaceholder').style.display = 'none';
+            }
+
+            if(importedData.products && Array.isArray(importedData.products)) {
+                document.getElementById('productList').innerHTML = '';
+                appData = [];
+                
+                importedData.products.forEach(p => {
+                    addProduct();
+                    const newItem = appData[appData.length - 1]; 
+                    const id = newItem.id;
+                    
+                    document.getElementById(`cod_${id}`).value = p.code || '';
+                    document.getElementById(`mod_${id}`).value = p.model || '';
+                    document.getElementById(`sn_${id}`).value = p.serialNumber || '';
+                    document.getElementById(`fab_${id}`).value = p.purchaseDate || '';
+                    document.getElementById(`def_${id}`).value = p.defect || '';
+                    document.getElementById(`cau_${id}`).value = p.cause || '';
+                    document.getElementById(`war_${id}`).value = p.warranty || '';
+                    document.getElementById(`obs_${id}`).value = p.obs || '';
+
+                    newItem.images = p.images || [];
+                    newItem.code = p.code || '';
+                    newItem.model = p.model || '';
+                    newItem.serialNumber = p.serialNumber || '';
+                    newItem.purchaseDate = p.purchaseDate || '';
+                    newItem.defect = p.defect || '';
+                    newItem.cause = p.cause || '';
+                    newItem.warranty = p.warranty || '';
+                    newItem.obs = p.obs || '';
+                    
+                    renderImages(id);
+                });
+                updateDash();
+            }
         }
 
         function saveJSON() {
@@ -650,52 +761,7 @@
             reader.onload = function(e) {
                 try {
                     const importedData = JSON.parse(e.target.result);
-                    
-                    if(importedData.header) {
-                        document.getElementById('inspector').value = importedData.header.inspector || '';
-                        document.getElementById('client').value = importedData.header.client || '';
-                        document.getElementById('sac').value = importedData.header.sac || '';
-                    }
-
-                    if(importedData.logo) {
-                        companyLogoBase64 = importedData.logo;
-                        document.getElementById('headerLogo').src = companyLogoBase64;
-                        document.getElementById('headerLogo').style.display = 'block';
-                        document.getElementById('headerLogoPlaceholder').style.display = 'none';
-                    }
-
-                    if(importedData.products && Array.isArray(importedData.products)) {
-                        document.getElementById('productList').innerHTML = '';
-                        appData = [];
-                        
-                        importedData.products.forEach(p => {
-                            addProduct();
-                            const newItem = appData[appData.length - 1]; 
-                            const id = newItem.id;
-                            
-                            document.getElementById(`cod_${id}`).value = p.code || '';
-                            document.getElementById(`mod_${id}`).value = p.model || '';
-                            document.getElementById(`sn_${id}`).value = p.serialNumber || '';
-                            document.getElementById(`fab_${id}`).value = p.purchaseDate || '';
-                            document.getElementById(`def_${id}`).value = p.defect || '';
-                            document.getElementById(`cau_${id}`).value = p.cause || '';
-                            document.getElementById(`war_${id}`).value = p.warranty || '';
-                            document.getElementById(`obs_${id}`).value = p.obs || '';
-
-                            newItem.images = p.images || [];
-                            newItem.code = p.code || '';
-                            newItem.model = p.model || '';
-                            newItem.serialNumber = p.serialNumber || '';
-                            newItem.purchaseDate = p.purchaseDate || '';
-                            newItem.defect = p.defect || '';
-                            newItem.cause = p.cause || '';
-                            newItem.warranty = p.warranty || '';
-                            newItem.obs = p.obs || '';
-                            
-                            renderImages(id);
-                        });
-                        updateDash();
-                    }
+                    restoreData(importedData);
                     alert('Projeto carregado com sucesso!');
                 } catch(err) {
                     console.error(err);
@@ -828,33 +894,12 @@
             }
         }
 
-        function fillTest() {
-            document.getElementById('inspector').value = "Técnico Silva";
-            document.getElementById('client').value = "Prefeitura Modelo";
-            document.getElementById('sac').value = "SAC-999";
-            if(dbProducts.length > 0) {
-                const id = appData[0].id;
-                
-                document.getElementById(`cod_${id}`).value = dbProducts[0].code;
-                checkCode(document.getElementById(`cod_${id}`), id);
-                
-                document.getElementById(`sn_${id}`).value = "NS_450";
-                updateData(id,'serialNumber',"NS_450");
-                
-                document.getElementById(`fab_${id}`).value = "2024-03-15";
-                updateData(id,'purchaseDate',"2024-03-15");
-                
-                document.getElementById(`war_${id}`).value = "Sim";
-                updateData(id,'warranty','Sim');
-                
-                document.getElementById(`def_${id}`).value = "Driver não acende (Inoperante)";
-                updateData(id,'defect',"Driver não acende (Inoperante)");
-                
-                document.getElementById(`cau_${id}`).value = "Driver";
-                updateData(id,'cause',"Driver");
+        function resetAll() { 
+            if(confirm('Reiniciar sistema? (Todos os dados não salvos serão apagados permanentemente)')) {
+                localStorage.removeItem('inspecao_backup_v6');
+                location.reload(); 
             }
         }
-        function resetAll() { if(confirm('Reiniciar sistema? (Todos os dados não salvos serão perdidos)')) location.reload(); }
     </script>
 </body>
 </html>
