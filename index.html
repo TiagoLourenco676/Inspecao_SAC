@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção v6.9 - Advanced Labs</title>
+    <title>Sistema de Inspeção v7.0 - Advanced Labs</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -125,7 +125,7 @@
             <div id="headerLogoPlaceholder" class="logo-placeholder">🏢</div>
             <div>
                 <h1 style="font-size: 18px; margin:0;">Sistema de Inspeção</h1>
-                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.9 - Textos Completos PDF</p>
+                <p style="font-size: 11px; opacity: 0.8; margin:0;">v7.0 - Textos Exatos no PDF</p>
             </div>
         </div>
         <div style="text-align: right; font-size: 12px;">
@@ -351,7 +351,7 @@
 
                     <div class="form-row">
                         <div><label>Defeito Identificado</label>
-                        <select id="def_${id}" class="form-control" onchange="updateData('${id}','defect',this.value)">
+                        <select id="def_${id}" class="form-control" onchange="updateData('${id}','defect', this.value ? this.options[this.selectedIndex].text : '')">
                             <option value="">Selecione o defeito...</option>
                             <optgroup label="Elétrico / Eletrônico">
                                 <option value="Driver não acende (Inoperante)">Driver não acende (Inoperante)</option>
@@ -381,7 +381,7 @@
                         </select></div>
                         
                         <div><label>Causa Provável</label>
-                        <select id="cau_${id}" class="form-control" onchange="updateData('${id}','cause',this.value)">
+                        <select id="cau_${id}" class="form-control" onchange="updateData('${id}','cause', this.value ? this.options[this.selectedIndex].text : '')">
                             <option value="">Selecione a categoria...</option>
                             <option value="Falha de Componente (Driver)">Falha de Componente (Driver)</option>
                             <option value="Falha de Vedação (Água)">Falha de Vedação (Água)</option>
@@ -661,18 +661,34 @@
             appData.forEach(item => {
                 const codeInput = document.getElementById(`cod_${item.id}`);
                 if(codeInput) item.code = codeInput.value;
+                
                 const modInput = document.getElementById(`mod_${item.id}`);
                 if(modInput) item.model = modInput.value;
+                
                 const snInput = document.getElementById(`sn_${item.id}`);
                 if(snInput) item.serialNumber = snInput.value;
+                
                 const fabInput = document.getElementById(`fab_${item.id}`);
                 if(fabInput) item.purchaseDate = fabInput.value;
+                
+                // CAPTURA 100% GARANTIDA DO TEXTO (Ignora o value)
                 const defInput = document.getElementById(`def_${item.id}`);
-                if(defInput) item.defect = defInput.value;
+                if(defInput && defInput.selectedIndex > 0) {
+                    item.defect = defInput.options[defInput.selectedIndex].text;
+                } else {
+                    item.defect = '';
+                }
+                
                 const cauInput = document.getElementById(`cau_${item.id}`);
-                if(cauInput) item.cause = cauInput.value;
+                if(cauInput && cauInput.selectedIndex > 0) {
+                    item.cause = cauInput.options[cauInput.selectedIndex].text;
+                } else {
+                    item.cause = '';
+                }
+                
                 const warInput = document.getElementById(`war_${item.id}`);
                 if(warInput) item.warranty = warInput.value;
+                
                 const obsInput = document.getElementById(`obs_${item.id}`);
                 if(obsInput) item.obs = obsInput.value;
             });
@@ -705,11 +721,10 @@
                     document.getElementById(`mod_${id}`).value = p.model || '';
                     document.getElementById(`sn_${id}`).value = p.serialNumber || '';
                     document.getElementById(`fab_${id}`).value = p.purchaseDate || '';
-                    document.getElementById(`def_${id}`).value = p.defect || '';
                     
                     // Transição Suave do JSON Antigo
                     let loadedCause = p.cause || '';
-                    const legacyMap = {
+                    const legacyMapCause = {
                         'Driver': 'Falha de Componente (Driver)',
                         'Água': 'Falha de Vedação (Água)',
                         'Energia': 'Rede Elétrica (Surto/Sem Aterramento)',
@@ -717,9 +732,19 @@
                         'Instalação': 'Erro de Instalação / Manuseio',
                         'Outros': 'Outros / Uso Inadequado'
                     };
-                    if (legacyMap[loadedCause]) loadedCause = legacyMap[loadedCause];
+                    if (legacyMapCause[loadedCause]) loadedCause = legacyMapCause[loadedCause];
 
-                    document.getElementById(`cau_${id}`).value = loadedCause;
+                    // Tenta selecionar no dropdown pelo TEXTO exato
+                    const defSelect = document.getElementById(`def_${id}`);
+                    Array.from(defSelect.options).forEach(opt => {
+                        if (opt.text === p.defect) opt.selected = true;
+                    });
+
+                    const cauSelect = document.getElementById(`cau_${id}`);
+                    Array.from(cauSelect.options).forEach(opt => {
+                        if (opt.text === loadedCause) opt.selected = true;
+                    });
+
                     document.getElementById(`war_${id}`).value = p.warranty || '';
                     document.getElementById(`obs_${id}`).value = p.obs || '';
 
@@ -812,7 +837,7 @@
             const btn = document.querySelector('button[onclick="generatePDF()"]');
             btn.innerText = "⏳ Gerando...";
             btn.disabled = true;
-            syncDOMtoData();
+            syncDOMtoData(); // GARANTE QUE O DOM E O APPDATA ESTÃO 100% SINCRONIZADOS COM O TEXTO
             
             try {
                 document.getElementById('p-inspector').innerText = document.getElementById('inspector').value || '-';
@@ -900,10 +925,6 @@
                 btn.innerText = "📄 Baixar PDF"; 
                 btn.disabled = false;
             }
-        }
-
-        function fillTest() {
-            // Teste apenas para preenchimento rápido
         }
 
         function resetAll() { 
