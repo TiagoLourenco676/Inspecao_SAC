@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção v6.8 - Advanced Labs</title>
+    <title>Sistema de Inspeção v6.9 - Advanced Labs</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -125,7 +125,7 @@
             <div id="headerLogoPlaceholder" class="logo-placeholder">🏢</div>
             <div>
                 <h1 style="font-size: 18px; margin:0;">Sistema de Inspeção</h1>
-                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.8 - Novos Defeitos (Surto)</p>
+                <p style="font-size: 11px; opacity: 0.8; margin:0;">v6.9 - Textos Completos PDF</p>
             </div>
         </div>
         <div style="text-align: right; font-size: 12px;">
@@ -260,7 +260,6 @@
             updateDatalist();
             initCharts(); 
             
-            // Aguarda um instante para evitar bloqueios do navegador no aviso de restaurar
             setTimeout(() => {
                 const isRecovered = checkBackup();
                 if (!isRecovered && appData.length === 0) {
@@ -277,9 +276,7 @@
             document.getElementById('clockTime').innerText = now.format('LT');
         }
 
-        // --- 8. PREVENÇÃO DE PERDA DE DADOS (AUTO-SAVE & ALERTAS) ---
-        
-        // 8.1 Evita fechar a página por acidente
+        // --- 8. PREVENÇÃO DE PERDA DE DADOS (AUTO-SAVE) ---
         window.addEventListener('beforeunload', function (e) {
             const hasInfo = appData.length > 0 || 
                             document.getElementById('inspector').value !== '' || 
@@ -288,14 +285,13 @@
             
             if (hasInfo) {
                 e.preventDefault();
-                e.returnValue = ''; // Exige confirmação nativa do navegador
+                e.returnValue = ''; 
             }
         });
 
-        // 8.2 Salva automaticamente a cada 10 segundos
         setInterval(() => {
             try {
-                if (appData.length === 0 && !document.getElementById('inspector').value) return; // Não salva vazio
+                if (appData.length === 0 && !document.getElementById('inspector').value) return;
                 syncDOMtoData();
                 const exportData = {
                     header: {
@@ -312,7 +308,6 @@
             }
         }, 10000);
 
-        // 8.3 Recupera dados da última sessão
         function checkBackup() {
             const backup = localStorage.getItem('inspecao_backup_v6');
             if (backup) {
@@ -355,7 +350,7 @@
                     </div>
 
                     <div class="form-row">
-                        <div><label>Defeito Identificado (Padrão SAC)</label>
+                        <div><label>Defeito Identificado</label>
                         <select id="def_${id}" class="form-control" onchange="updateData('${id}','defect',this.value)">
                             <option value="">Selecione o defeito...</option>
                             <optgroup label="Elétrico / Eletrônico">
@@ -385,15 +380,15 @@
                             </optgroup>
                         </select></div>
                         
-                        <div><label>Causa Provável (Para o Gráfico)</label>
+                        <div><label>Causa Provável</label>
                         <select id="cau_${id}" class="form-control" onchange="updateData('${id}','cause',this.value)">
                             <option value="">Selecione a categoria...</option>
-                            <option value="Driver">Falha de Componente (Driver)</option>
-                            <option value="Água">Falha de Vedação (Água)</option>
-                            <option value="Energia">Rede Elétrica (Surto/Sem Aterramento)</option>
-                            <option value="Fabricação">Processo de Montagem</option>
-                            <option value="Instalação">Erro de Instalação / Manuseio</option>
-                            <option value="Outros">Outros / Uso Inadequado</option>
+                            <option value="Falha de Componente (Driver)">Falha de Componente (Driver)</option>
+                            <option value="Falha de Vedação (Água)">Falha de Vedação (Água)</option>
+                            <option value="Rede Elétrica (Surto/Sem Aterramento)">Rede Elétrica (Surto/Sem Aterramento)</option>
+                            <option value="Processo de Montagem">Processo de Montagem</option>
+                            <option value="Erro de Instalação / Manuseio">Erro de Instalação / Manuseio</option>
+                            <option value="Outros / Uso Inadequado">Outros / Uso Inadequado</option>
                         </select></div>
                     </div>
                     
@@ -604,18 +599,15 @@
             document.getElementById('st-yes').innerText = yes;
             document.getElementById('st-no').innerText = no;
 
-            // Gráfico 1: Garantia
             chart1.data.datasets[0].data = [yes, no];
             chart1.update();
 
-            // Gráfico 2: Causas
             const causes = {};
             appData.forEach(i => { if(i.cause) causes[i.cause] = (causes[i.cause]||0)+1; });
             chart2.data.labels = Object.keys(causes);
             chart2.data.datasets[0].data = Object.values(causes);
             chart2.update();
 
-            // Gráfico 3: Datas de Fabricação (Agrupadas por Mês/Ano)
             const rawDates = {};
             appData.forEach(i => {
                 if(i.purchaseDate) {
@@ -714,7 +706,20 @@
                     document.getElementById(`sn_${id}`).value = p.serialNumber || '';
                     document.getElementById(`fab_${id}`).value = p.purchaseDate || '';
                     document.getElementById(`def_${id}`).value = p.defect || '';
-                    document.getElementById(`cau_${id}`).value = p.cause || '';
+                    
+                    // Transição Suave do JSON Antigo
+                    let loadedCause = p.cause || '';
+                    const legacyMap = {
+                        'Driver': 'Falha de Componente (Driver)',
+                        'Água': 'Falha de Vedação (Água)',
+                        'Energia': 'Rede Elétrica (Surto/Sem Aterramento)',
+                        'Fabricação': 'Processo de Montagem',
+                        'Instalação': 'Erro de Instalação / Manuseio',
+                        'Outros': 'Outros / Uso Inadequado'
+                    };
+                    if (legacyMap[loadedCause]) loadedCause = legacyMap[loadedCause];
+
+                    document.getElementById(`cau_${id}`).value = loadedCause;
                     document.getElementById(`war_${id}`).value = p.warranty || '';
                     document.getElementById(`obs_${id}`).value = p.obs || '';
 
@@ -724,7 +729,7 @@
                     newItem.serialNumber = p.serialNumber || '';
                     newItem.purchaseDate = p.purchaseDate || '';
                     newItem.defect = p.defect || '';
-                    newItem.cause = p.cause || '';
+                    newItem.cause = loadedCause;
                     newItem.warranty = p.warranty || '';
                     newItem.obs = p.obs || '';
                     
@@ -895,6 +900,10 @@
                 btn.innerText = "📄 Baixar PDF"; 
                 btn.disabled = false;
             }
+        }
+
+        function fillTest() {
+            // Teste apenas para preenchimento rápido
         }
 
         function resetAll() { 
