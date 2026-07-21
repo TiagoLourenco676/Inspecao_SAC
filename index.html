@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção v7.0 - Advanced Labs</title>
+    <title>Sistema de Inspeção v7.1 - Advanced Labs</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -125,7 +125,7 @@
             <div id="headerLogoPlaceholder" class="logo-placeholder">🏢</div>
             <div>
                 <h1 style="font-size: 18px; margin:0;">Sistema de Inspeção</h1>
-                <p style="font-size: 11px; opacity: 0.8; margin:0;">v7.0 - Textos Exatos no PDF</p>
+                <p style="font-size: 11px; opacity: 0.8; margin:0;">v7.1 - Ajuste nas Causas</p>
             </div>
         </div>
         <div style="text-align: right; font-size: 12px;">
@@ -186,7 +186,9 @@
     <button class="fab" onclick="addProduct()">+</button>
     <datalist id="dbList"></datalist>
 
+    <!-- Estrutura do PDF dividida em blocos lógicos -->
     <div id="pdf-template">
+        <!-- Bloco 1: Cabeçalho -->
         <div id="pdf-block-header" class="pdf-section">
             <div class="pdf-header">
                 <div class="pdf-title">
@@ -203,6 +205,7 @@
             </div>
         </div>
 
+        <!-- Bloco 2: Dashboard -->
         <div id="pdf-block-dash" class="pdf-section pdf-dash-section">
             <h4 style="margin-top:0; border-bottom:1px solid #ccc; padding-bottom:5px;">Resumo Estatístico</h4>
             <div class="pdf-stats-row">
@@ -226,8 +229,10 @@
             </div>
         </div>
 
+        <!-- Bloco 3: Itens -->
         <div id="pdf-items"></div>
         
+        <!-- Bloco 4: Rodapé e Assinaturas -->
         <div id="pdf-block-footer" class="pdf-section" style="margin-top: 20px;">
             <div class="pdf-signature-container" style="display: flex; justify-content: space-between; margin-top: 40px;">
                 <div class="pdf-signature-item" style="text-align: center; width: 45%;">
@@ -260,6 +265,7 @@
             updateDatalist();
             initCharts(); 
             
+            // Aguarda um instante para evitar bloqueios do navegador no aviso de restaurar
             setTimeout(() => {
                 const isRecovered = checkBackup();
                 if (!isRecovered && appData.length === 0) {
@@ -291,7 +297,7 @@
 
         setInterval(() => {
             try {
-                if (appData.length === 0 && !document.getElementById('inspector').value) return;
+                if (appData.length === 0 && !document.getElementById('inspector').value) return; // Não salva vazio
                 syncDOMtoData();
                 const exportData = {
                     header: {
@@ -384,11 +390,13 @@
                         <select id="cau_${id}" class="form-control" onchange="updateData('${id}','cause', this.value ? this.options[this.selectedIndex].text : '')">
                             <option value="">Selecione a categoria...</option>
                             <option value="Falha de Componente (Driver)">Falha de Componente (Driver)</option>
+                            <option value="Falha no Componente">Falha no Componente</option>
                             <option value="Falha de Vedação (Água)">Falha de Vedação (Água)</option>
                             <option value="Rede Elétrica (Surto/Sem Aterramento)">Rede Elétrica (Surto/Sem Aterramento)</option>
                             <option value="Processo de Montagem">Processo de Montagem</option>
                             <option value="Erro de Instalação / Manuseio">Erro de Instalação / Manuseio</option>
-                            <option value="Outros / Uso Inadequado">Outros / Uso Inadequado</option>
+                            <option value="Uso Inadequado">Uso Inadequado</option>
+                            <option value="Outros">Outros</option>
                         </select></div>
                     </div>
                     
@@ -599,15 +607,18 @@
             document.getElementById('st-yes').innerText = yes;
             document.getElementById('st-no').innerText = no;
 
+            // Gráfico 1: Garantia
             chart1.data.datasets[0].data = [yes, no];
             chart1.update();
 
+            // Gráfico 2: Causas
             const causes = {};
             appData.forEach(i => { if(i.cause) causes[i.cause] = (causes[i.cause]||0)+1; });
             chart2.data.labels = Object.keys(causes);
             chart2.data.datasets[0].data = Object.values(causes);
             chart2.update();
 
+            // Gráfico 3: Datas de Fabricação (Agrupadas por Mês/Ano)
             const rawDates = {};
             appData.forEach(i => {
                 if(i.purchaseDate) {
@@ -671,7 +682,7 @@
                 const fabInput = document.getElementById(`fab_${item.id}`);
                 if(fabInput) item.purchaseDate = fabInput.value;
                 
-                // CAPTURA 100% GARANTIDA DO TEXTO (Ignora o value)
+                // CAPTURA 100% GARANTIDA DO TEXTO
                 const defInput = document.getElementById(`def_${item.id}`);
                 if(defInput && defInput.selectedIndex > 0) {
                     item.defect = defInput.options[defInput.selectedIndex].text;
@@ -730,7 +741,7 @@
                         'Energia': 'Rede Elétrica (Surto/Sem Aterramento)',
                         'Fabricação': 'Processo de Montagem',
                         'Instalação': 'Erro de Instalação / Manuseio',
-                        'Outros': 'Outros / Uso Inadequado'
+                        'Outros / Uso Inadequado': 'Outros' 
                     };
                     if (legacyMapCause[loadedCause]) loadedCause = legacyMapCause[loadedCause];
 
@@ -837,7 +848,7 @@
             const btn = document.querySelector('button[onclick="generatePDF()"]');
             btn.innerText = "⏳ Gerando...";
             btn.disabled = true;
-            syncDOMtoData(); // GARANTE QUE O DOM E O APPDATA ESTÃO 100% SINCRONIZADOS COM O TEXTO
+            syncDOMtoData(); 
             
             try {
                 document.getElementById('p-inspector').innerText = document.getElementById('inspector').value || '-';
@@ -927,6 +938,32 @@
             }
         }
 
+        function fillTest() {
+            document.getElementById('inspector').value = "Técnico Silva";
+            document.getElementById('client').value = "Prefeitura Modelo";
+            document.getElementById('sac').value = "SAC-999";
+            if(dbProducts.length > 0) {
+                const id = appData[0].id;
+                
+                document.getElementById(`cod_${id}`).value = dbProducts[0].code;
+                checkCode(document.getElementById(`cod_${id}`), id);
+                
+                document.getElementById(`sn_${id}`).value = "NS_450";
+                updateData(id,'serialNumber',"NS_450");
+                
+                document.getElementById(`fab_${id}`).value = "2024-03-15";
+                updateData(id,'purchaseDate',"2024-03-15");
+                
+                document.getElementById(`war_${id}`).value = "Sim";
+                updateData(id,'warranty','Sim');
+                
+                document.getElementById(`def_${id}`).value = "Driver não acende (Inoperante)";
+                updateData(id,'defect',"Driver não acende (Inoperante)");
+                
+                document.getElementById(`cau_${id}`).value = "Falha de Componente (Driver)";
+                updateData(id,'cause',"Falha de Componente (Driver)");
+            }
+        }
         function resetAll() { 
             if(confirm('Reiniciar sistema? (Todos os dados não salvos serão apagados permanentemente)')) {
                 localStorage.removeItem('inspecao_backup_v6');
