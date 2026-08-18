@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção v7.3 - Advanced Labs</title>
+    <title>Sistema de Inspeção v7.5 - Advanced Labs</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -11,6 +11,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/locale/pt-br.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     
     <style>
         :root {
@@ -125,7 +127,7 @@
             <div id="headerLogoPlaceholder" class="logo-placeholder">🏢</div>
             <div>
                 <h1 style="font-size: 18px; margin:0;">Sistema de Inspeção</h1>
-                <p style="font-size: 11px; opacity: 0.8; margin:0;">v7.3 - Simplificação de Ingresso de Água</p>
+                <p style="font-size: 11px; opacity: 0.8; margin:0;">v7.5 - PDF + JSON salvos juntos na pasta escolhida</p>
             </div>
         </div>
         <div style="text-align: right; font-size: 12px;">
@@ -141,6 +143,7 @@
         <button class="btn-excel" onclick="document.getElementById('excelInput').click()">📊 Importar Excel/CSV</button>
         <input type="file" id="excelInput" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleExcel(this)">
         <input type="file" id="jsonInput" accept=".json" style="display: none;" onchange="loadJSON(this)">
+        <input type="file" id="pdfProjectInput" accept="application/pdf,.pdf" style="display: none;" onchange="loadProjectFromPDF(this)">
     </div>
 
     <div class="nav-container">
@@ -164,8 +167,10 @@
             <div class="card" style="text-align: center;">
                 <button class="btn-excel" style="background:var(--purple);" onclick="saveJSON()">💾 Salvar Projeto</button>
                 <button class="btn-excel" style="background:var(--warning);" onclick="document.getElementById('jsonInput').click()">📁 Carregar Projeto</button>
-                <button class="btn-excel" style="background:var(--primary);" onclick="generatePDF()">📄 Baixar PDF</button>
+                <button class="btn-excel" style="background:var(--primary);" onclick="generatePDF()">📄 Gerar PDF + JSON</button>
+                <button class="btn-excel" style="background:#16a085;" onclick="document.getElementById('pdfProjectInput').click()">♻️ Recuperar de PDF</button>
                 <button class="btn-excel" style="background:var(--danger);" onclick="resetAll()">🗑️ Limpar</button>
+                <div style="margin-top:10px;font-size:12px;color:#607080;">Ao gerar o relatório, escolha a pasta: o PDF e o JSON serão salvos automaticamente juntos. O PDF também mantém o JSON incorporado como backup.</div>
             </div>
         </div>
 
@@ -259,6 +264,10 @@
         let appData = [];
         let companyLogoBase64 = null;
         let chart1, chart2, chart3;
+
+        if (window.pdfjsLib) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             updateTime();
@@ -705,6 +714,20 @@
             });
         }
 
+        function normalizeLegacyDefect(defect, obs) {
+            const raw = (defect || '').trim();
+            let normalized = raw;
+            let newObs = obs || '';
+            if (/^Ingresso de água pelo /i.test(raw)) {
+                normalized = 'Ingresso de água';
+                if (raw && !newObs.toLowerCase().includes(raw.toLowerCase())) {
+                    const detalhe = `Origem registrada no relatório antigo: ${raw}.`;
+                    newObs = newObs && newObs !== '-' ? `${detalhe} ${newObs}` : detalhe;
+                }
+            }
+            return { defect: normalized, obs: newObs };
+        }
+
         function restoreData(importedData) {
             if(importedData.header) {
                 document.getElementById('inspector').value = importedData.header.inspector || '';
@@ -733,7 +756,7 @@
                     document.getElementById(`sn_${id}`).value = p.serialNumber || '';
                     document.getElementById(`fab_${id}`).value = p.purchaseDate || '';
                     
-                    // Transição Suave do JSON Antigo
+                    // Compatibilidade com projetos antigos
                     let loadedCause = p.cause || '';
                     const legacyMapCause = {
                         'Driver': 'Falha de Componente (Driver)',
@@ -745,29 +768,43 @@
                     };
                     if (legacyMapCause[loadedCause]) loadedCause = legacyMapCause[loadedCause];
 
-                    // Tenta selecionar no dropdown pelo TEXTO exato
+                    const legacyDefect = normalizeLegacyDefect(p.defect || '', p.obs || '');
+                    const loadedDefect = legacyDefect.defect;
+                    const loadedObs = legacyDefect.obs;
+
                     const defSelect = document.getElementById(`def_${id}`);
+                    let defectMatched = false;
                     Array.from(defSelect.options).forEach(opt => {
-                        if (opt.text === p.defect) opt.selected = true;
+                        if (opt.text === loadedDefect) { opt.selected = true; defectMatched = true; }
                     });
+                    // Preserva valores históricos que ainda não existam na lista atual
+                    if (loadedDefect && !defectMatched) {
+                        const opt = new Option(`Histórico: ${loadedDefect}`, loadedDefect, true, true);
+                        defSelect.add(opt);
+                    }
 
                     const cauSelect = document.getElementById(`cau_${id}`);
+                    let causeMatched = false;
                     Array.from(cauSelect.options).forEach(opt => {
-                        if (opt.text === loadedCause) opt.selected = true;
+                        if (opt.text === loadedCause) { opt.selected = true; causeMatched = true; }
                     });
+                    if (loadedCause && !causeMatched) {
+                        const opt = new Option(`Histórico: ${loadedCause}`, loadedCause, true, true);
+                        cauSelect.add(opt);
+                    }
 
                     document.getElementById(`war_${id}`).value = p.warranty || '';
-                    document.getElementById(`obs_${id}`).value = p.obs || '';
+                    document.getElementById(`obs_${id}`).value = loadedObs || '';
 
                     newItem.images = p.images || [];
                     newItem.code = p.code || '';
                     newItem.model = p.model || '';
                     newItem.serialNumber = p.serialNumber || '';
                     newItem.purchaseDate = p.purchaseDate || '';
-                    newItem.defect = p.defect || '';
+                    newItem.defect = loadedDefect;
                     newItem.cause = loadedCause;
                     newItem.warranty = p.warranty || '';
-                    newItem.obs = p.obs || '';
+                    newItem.obs = loadedObs || '';
                     
                     renderImages(id);
                 });
@@ -775,27 +812,89 @@
             }
         }
 
-        function saveJSON() {
+        function getExportData() {
             syncDOMtoData();
-            const exportData = {
+            return {
                 header: {
                     inspector: document.getElementById('inspector').value,
                     client: document.getElementById('client').value,
                     sac: document.getElementById('sac').value
                 },
                 logo: companyLogoBase64,
-                products: appData
+                products: appData,
+                _backupInfo: { version: '7.5', embeddedInPdf: true, externalJsonSavedWithPdf: true, createdAt: new Date().toISOString() }
             };
+        }
+
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+        }
+
+        function sanitizeFilenamePart(value, fallback = 'Projeto') {
+            const raw = String(value || '').trim() || fallback;
+            return raw
+                .replace(/[<>:\"/\\|?*\x00-\x1F]/g, '_')
+                .replace(/\s+/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^[_\.]+|[_\.]+$/g, '') || fallback;
+        }
+
+        async function chooseOutputDirectory() {
+            if (!window.showDirectoryPicker) {
+                return null;
+            }
+            return await window.showDirectoryPicker({ mode: 'readwrite' });
+        }
+
+        async function writeBlobToDirectory(directoryHandle, filename, blob) {
+            const fileHandle = await directoryHandle.getFileHandle(filename, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+        }
+
+        async function loadProjectFromPDF(input) {
+            const file = input.files[0];
+            if (!file) return;
+            try {
+                if (!window.pdfjsLib) throw new Error('PDF.js não carregou. Verifique a conexão com a internet.');
+                const data = new Uint8Array(await file.arrayBuffer());
+                const pdf = await pdfjsLib.getDocument({data}).promise;
+                const attachments = await pdf.getAttachments();
+                const entries = attachments instanceof Map ? Array.from(attachments.entries()) : Object.entries(attachments || {});
+                const jsonEntry = entries.find(([name]) => /\.json$/i.test(name));
+                if (!jsonEntry) {
+                    alert('Este PDF não possui JSON incorporado. Ele provavelmente foi criado em uma versão anterior. Use o aplicativo Recuperador PDF → JSON para reconstruí-lo por OCR.');
+                    return;
+                }
+                const [name, attachment] = jsonEntry;
+                let content = attachment && attachment.content;
+                if (!content && attachment && attachment.id && pdf.getAttachmentContent) {
+                    const got = await pdf.getAttachmentContent(attachment.id);
+                    content = got && (got.content || got);
+                }
+                if (!content) throw new Error('O anexo JSON foi localizado, mas não pôde ser lido.');
+                const jsonText = new TextDecoder('utf-8').decode(content);
+                const importedData = JSON.parse(jsonText);
+                restoreData(importedData);
+                alert(`Projeto recuperado do PDF com sucesso (${name}).`);
+            } catch (err) {
+                console.error(err);
+                alert('Não foi possível recuperar o projeto deste PDF: ' + err.message);
+            } finally {
+                input.value = '';
+            }
+        }
+
+        function saveJSON() {
+            const exportData = getExportData();
 
             const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `Inspecao_${document.getElementById('sac').value || 'Projeto'}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            downloadBlob(blob, `Inspecao_${document.getElementById('sac').value || 'Projeto'}.json`);
         }
 
         function loadJSON(input) {
@@ -846,7 +945,28 @@
 
         async function generatePDF() {
             const btn = document.querySelector('button[onclick="generatePDF()"]');
-            btn.innerText = "⏳ Gerando...";
+
+            // A seleção da pasta precisa acontecer diretamente após o clique do usuário.
+            // Chrome, Edge e Electron compatíveis abrirão o seletor de pasta aqui.
+            let outputDirectory = null;
+            let folderMode = true;
+            try {
+                if (window.showDirectoryPicker) {
+                    outputDirectory = await chooseOutputDirectory();
+                } else {
+                    folderMode = false;
+                    alert('Este navegador não permite escolher uma pasta para gravação direta. O sistema fará o download do PDF e do JSON separadamente. Para salvar os dois automaticamente na mesma pasta, use Chrome, Edge ou a versão Electron compatível.');
+                }
+            } catch (err) {
+                if (err && err.name === 'AbortError') {
+                    return; // usuário cancelou a escolha da pasta
+                }
+                console.error('Erro ao selecionar pasta:', err);
+                alert('Não foi possível acessar a pasta escolhida. Nenhum arquivo foi salvo.');
+                return;
+            }
+
+            btn.innerText = "⏳ Gerando PDF + JSON...";
             btn.disabled = true;
             syncDOMtoData(); 
             
@@ -925,15 +1045,50 @@
                 }
 
                 await addSectionToPDF(doc, document.getElementById('pdf-block-footer'), currentY, margin, pageWidth, pageHeight);
-                
-                doc.save(`Relatorio_SAC_${document.getElementById('sac').value || '000'}.pdf`);
+
+                // v7.5: um único snapshot de dados alimenta o JSON externo e o JSON incorporado no PDF.
+                const exportData = getExportData();
+                const jsonText = JSON.stringify(exportData, null, 2);
+                const jsonBytes = new TextEncoder().encode(jsonText);
+
+                const sacSafe = sanitizeFilenamePart(document.getElementById('sac').value || 'Projeto');
+                const backupName = `Inspecao_${sacSafe}.json`;
+                const pdfName = `Relatorio_SAC_${sacSafe}.pdf`;
+
+                // Mantém o JSON incorporado ao PDF como segunda camada de backup.
+                const rawPdf = doc.output('arraybuffer');
+                const pdfLibDoc = await PDFLib.PDFDocument.load(rawPdf);
+                await pdfLibDoc.attach(jsonBytes, backupName, {
+                    mimeType: 'application/json',
+                    description: 'Backup completo do projeto do Sistema de Inspecao v7.5',
+                    creationDate: new Date(),
+                    modificationDate: new Date()
+                });
+                pdfLibDoc.setProducer('Advanced Labs - Sistema de Inspecao v7.5');
+                pdfLibDoc.setSubject('Relatorio de SAC com JSON externo e backup JSON incorporado');
+                const finalPdfBytes = await pdfLibDoc.save();
+
+                const pdfBlob = new Blob([finalPdfBytes], {type:'application/pdf'});
+                const jsonBlob = new Blob([jsonText], {type:'application/json'});
+
+                if (folderMode && outputDirectory) {
+                    // Salva os dois arquivos automaticamente na MESMA pasta selecionada.
+                    await writeBlobToDirectory(outputDirectory, pdfName, pdfBlob);
+                    await writeBlobToDirectory(outputDirectory, backupName, jsonBlob);
+                    alert(`Arquivos salvos com sucesso na pasta escolhida:\n\n${pdfName}\n${backupName}`);
+                } else {
+                    // Fallback para navegadores sem File System Access API.
+                    downloadBlob(pdfBlob, pdfName);
+                    downloadBlob(jsonBlob, backupName);
+                }
+
                 element.style.display = 'none';
             } catch(e) { 
                 console.error(e); 
-                alert('Erro ao gerar PDF. Verifique o console.'); 
+                alert('Erro ao gerar ou salvar PDF/JSON. Verifique o console.'); 
                 document.getElementById('pdf-template').style.display = 'none';
             } finally { 
-                btn.innerText = "📄 Baixar PDF"; 
+                btn.innerText = "📄 Gerar PDF + JSON"; 
                 btn.disabled = false;
             }
         }
