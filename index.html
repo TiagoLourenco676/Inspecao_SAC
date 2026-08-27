@@ -616,8 +616,16 @@
             document.getElementById('st-yes').innerText = yes;
             document.getElementById('st-no').innerText = no;
 
-            // Gráfico 1: Garantia
-            chart1.data.datasets[0].data = [yes, no];
+            // Gráfico 1: itens SEM GARANTIA, separados pelo defeito identificado.
+            // Destaque principal: quantos itens sem garantia tiveram "Sem defeito aparente".
+            const noWarrantyItems = appData.filter(x => x.warranty === 'Não');
+            const noWarrantyNoApparentDefect = noWarrantyItems.filter(x =>
+                String(x.defect || '').trim().toLocaleLowerCase('pt-BR') === 'sem defeito aparente'
+            ).length;
+            const noWarrantyOtherDefects = noWarrantyItems.length - noWarrantyNoApparentDefect;
+
+            chart1.data.datasets[0].data = [noWarrantyNoApparentDefect, noWarrantyOtherDefects];
+            chart1.options.plugins.title.text = `Sem Garantia: ${no} | Sem defeito aparente: ${noWarrantyNoApparentDefect}`;
             chart1.update();
 
             // Gráfico 2: Causas
@@ -661,8 +669,26 @@
         function initCharts() {
             chart1 = new Chart(document.getElementById('chart1'), {
                 type: 'doughnut',
-                data: { labels: ['Garantia','Sem Garantia'], datasets: [{ data: [0,0], backgroundColor: ['#27ae60','#c0392b'] }] },
-                options: { animation: false, maintainAspectRatio: false, plugins: { title: {display:true, text:'Status'}, legend: {position:'bottom'} } }
+                data: {
+                    labels: ['Sem defeito aparente', 'Outros defeitos'],
+                    datasets: [{ data: [0,0], backgroundColor: ['#f39c12','#c0392b'] }]
+                },
+                options: {
+                    animation: false,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {display:true, text:'Sem Garantia | Sem defeito aparente: 0'},
+                        legend: {position:'bottom'},
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed || 0;
+                                    return `${context.label}: ${value}`;
+                                }
+                            }
+                        }
+                    }
+                }
             });
             chart2 = new Chart(document.getElementById('chart2'), {
                 type: 'bar',
