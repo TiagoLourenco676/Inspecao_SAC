@@ -616,16 +616,17 @@
             document.getElementById('st-yes').innerText = yes;
             document.getElementById('st-no').innerText = no;
 
-            // Gráfico 1: itens SEM GARANTIA, separados pelo defeito identificado.
-            // Destaque principal: quantos itens sem garantia tiveram "Sem defeito aparente".
+            // Gráfico 1: continua mostrando TODAS as peças.
+            // Separação visual: Com garantia | Sem garantia (sem defeito aparente) | Sem garantia (outros defeitos).
             const noWarrantyItems = appData.filter(x => x.warranty === 'Não');
-            const noWarrantyNoApparentDefect = noWarrantyItems.filter(x =>
-                String(x.defect || '').trim().toLocaleLowerCase('pt-BR') === 'sem defeito aparente'
-            ).length;
+            const noWarrantyNoApparentDefect = noWarrantyItems.filter(x => {
+                const defectText = String(x.defect || '').trim().toLocaleLowerCase('pt-BR');
+                return defectText === 'sem defeito aparente' || defectText === 'sem defeito aparente (ok em teste 24h)';
+            }).length;
             const noWarrantyOtherDefects = noWarrantyItems.length - noWarrantyNoApparentDefect;
 
-            chart1.data.datasets[0].data = [noWarrantyNoApparentDefect, noWarrantyOtherDefects];
-            chart1.options.plugins.title.text = `Sem Garantia: ${no} | Sem defeito aparente: ${noWarrantyNoApparentDefect}`;
+            chart1.data.datasets[0].data = [yes, noWarrantyNoApparentDefect, noWarrantyOtherDefects];
+            chart1.options.plugins.title.text = `Total: ${total} | Com garantia: ${yes} | Sem garantia: ${no} | Sem defeito aparente: ${noWarrantyNoApparentDefect}`;
             chart1.update();
 
             // Gráfico 2: Causas
@@ -670,20 +671,22 @@
             chart1 = new Chart(document.getElementById('chart1'), {
                 type: 'doughnut',
                 data: {
-                    labels: ['Sem defeito aparente', 'Outros defeitos'],
-                    datasets: [{ data: [0,0], backgroundColor: ['#f39c12','#c0392b'] }]
+                    labels: ['Com garantia', 'Sem garantia (sem defeito aparente)', 'Sem garantia (outros defeitos)'],
+                    datasets: [{ data: [0,0,0], backgroundColor: ['#27ae60','#f39c12','#c0392b'] }]
                 },
                 options: {
                     animation: false,
                     maintainAspectRatio: false,
                     plugins: {
-                        title: {display:true, text:'Sem Garantia | Sem defeito aparente: 0'},
+                        title: {display:true, text:'Total: 0 | Com garantia: 0 | Sem garantia: 0 | Sem defeito aparente: 0'},
                         legend: {position:'bottom'},
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
                                     const value = context.parsed || 0;
-                                    return `${context.label}: ${value}`;
+                                    const total = context.dataset.data.reduce((sum, val) => sum + Number(val || 0), 0);
+                                    const pct = total ? ((value / total) * 100).toFixed(1) : '0.0';
+                                    return `${context.label}: ${value} (${pct}%)`;
                                 }
                             }
                         }
