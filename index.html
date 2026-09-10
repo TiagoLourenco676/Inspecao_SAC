@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção v7.5 - Advanced Labs</title>
+    <title>Sistema de Inspeção v7.8 - Advanced Labs</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -83,6 +83,14 @@
         .stat-card { background: white; padding: 15px; text-align: center; border-radius: 8px; }
         .stat-val { font-size: 28px; font-weight: bold; color: var(--primary); }
         .chart-box { background: white; padding: 15px; border-radius: 8px; height: 300px; position: relative; }
+        .fab-summary { background: white; padding: 18px; border-radius: 8px; margin-top: 5px; margin-bottom: 20px; }
+        .fab-summary h3 { margin: 0 0 12px 0; color: var(--secondary); font-size: 16px; }
+        .fab-summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .fab-summary-table th, .fab-summary-table td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; vertical-align: top; }
+        .fab-summary-table th { background: #f3f6f8; color: #34495e; }
+        .fab-summary-empty { color: #7f8c8d; font-size: 13px; padding: 8px 0; }
+        .fab-problem-list { margin: 0; padding-left: 18px; }
+        .fab-problem-list li { margin: 2px 0; }
 
         .fab { position: fixed; bottom: 25px; right: 25px; width: 55px; height: 55px; background: var(--success); color: white; border-radius: 50%; border: none; font-size: 28px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
 
@@ -99,8 +107,15 @@
         .pdf-dash-section { border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: white; }
         .pdf-stats-row { display: flex; justify-content: space-between; margin-bottom: 15px; text-align: center; }
         .pdf-stat-box { background: #eee; padding: 10px; width: 30%; border-radius: 4px; }
-        .pdf-charts-row { display: flex; justify-content: space-between; align-items: center; gap: 5px; }
-        .pdf-chart-img { width: 32%; height: auto; border: 1px solid #eee; border-radius: 4px; }
+        .pdf-charts-row { display: flex; justify-content: space-between; align-items: stretch; gap: 8px; flex-wrap: wrap; }
+        .pdf-chart-img { width: 48.5%; height: 190px; object-fit: contain; border: 1px solid #eee; border-radius: 4px; background: white; }
+        .pdf-fab-summary { margin-top: 14px; border-top: 1px solid #ddd; padding-top: 12px; }
+        .pdf-fab-summary h5 { margin: 0 0 8px 0; font-size: 12px; color: #34495e; }
+        .pdf-fab-summary table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        .pdf-fab-summary th, .pdf-fab-summary td { border: 1px solid #ddd; padding: 5px 6px; text-align: left; vertical-align: top; }
+        .pdf-fab-summary th { background: #f3f6f8; }
+        .pdf-fab-summary ul { margin: 0; padding-left: 14px; }
+        .pdf-fab-summary li { margin: 1px 0; }
 
         /* Estilo do Item no PDF */
         .pdf-product { border: 1px solid #ccc; margin-bottom: 15px; background: white; border-radius: 4px; overflow: hidden;}
@@ -127,7 +142,7 @@
             <div id="headerLogoPlaceholder" class="logo-placeholder">🏢</div>
             <div>
                 <h1 style="font-size: 18px; margin:0;">Sistema de Inspeção</h1>
-                <p style="font-size: 11px; opacity: 0.8; margin:0;">v7.5 - PDF + JSON salvos juntos na pasta escolhida</p>
+                <p style="font-size: 11px; opacity: 0.8; margin:0;">v7.8 - Dashboard ampliado + resumo por data de fabricação</p>
             </div>
         </div>
         <div style="text-align: right; font-size: 12px;">
@@ -184,6 +199,12 @@
                 <div class="chart-box"><canvas id="chart1"></canvas></div>
                 <div class="chart-box"><canvas id="chart2"></canvas></div>
                 <div class="chart-box"><canvas id="chart3"></canvas></div>
+                <div class="chart-box"><canvas id="chart4"></canvas></div>
+                <div class="chart-box"><canvas id="chart5"></canvas></div>
+            </div>
+            <div class="fab-summary">
+                <h3>📅 Resumo por Data de Fabricação e Problemas</h3>
+                <div id="fabrication-problem-summary" class="fab-summary-empty">Nenhuma data de fabricação informada.</div>
             </div>
         </div>
     </div>
@@ -231,6 +252,12 @@
                 <img id="pdf-img-chart1" class="pdf-chart-img">
                 <img id="pdf-img-chart2" class="pdf-chart-img">
                 <img id="pdf-img-chart3" class="pdf-chart-img">
+                <img id="pdf-img-chart4" class="pdf-chart-img">
+                <img id="pdf-img-chart5" class="pdf-chart-img">
+            </div>
+            <div class="pdf-fab-summary">
+                <h5>Resumo por Data de Fabricação e Problemas</h5>
+                <div id="pdf-fabrication-problem-summary"></div>
             </div>
         </div>
 
@@ -263,7 +290,7 @@
         ];
         let appData = [];
         let companyLogoBase64 = null;
-        let chart1, chart2, chart3;
+        let chart1, chart2, chart3, chart4, chart5;
 
         if (window.pdfjsLib) {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -462,7 +489,7 @@
             const item = appData.find(x => x.id === id);
             if(item) {
                 item[field] = val;
-                if(field === 'warranty' || field === 'cause' || field === 'purchaseDate') updateDash();
+                if(field === 'warranty' || field === 'cause' || field === 'purchaseDate' || field === 'defect') updateDash();
             }
         }
 
@@ -606,7 +633,7 @@
         }
 
         function updateDash() {
-            if (!chart1 || !chart2 || !chart3) return;
+            if (!chart1 || !chart2 || !chart3 || !chart4 || !chart5) return;
 
             const total = appData.length;
             const yes = appData.filter(x => x.warranty === 'Sim').length;
@@ -636,10 +663,103 @@
             chart2.data.datasets[0].data = Object.values(causes);
             chart2.update();
 
-            // Gráfico 3: Datas de Fabricação (Agrupadas por Mês/Ano)
+            // Gráficos 3, 4 e 5: lotes de fabricação por mês/ano.
+            // O gráfico 3 mantém a visão geral; 4 e 5 separam por situação de garantia.
+            const allLots = aggregateLotsByMonth(appData);
+            const warrantyLots = aggregateLotsByMonth(appData.filter(i => i.warranty === 'Sim'));
+            const noWarrantyLots = aggregateLotsByMonth(appData.filter(i => i.warranty === 'Não'));
+
+            chart3.data.labels = allLots.labels;
+            chart3.data.datasets[0].data = allLots.data;
+            chart3.update();
+
+            chart4.data.labels = warrantyLots.labels;
+            chart4.data.datasets[0].data = warrantyLots.data;
+            chart4.update();
+
+            chart5.data.labels = noWarrantyLots.labels;
+            chart5.data.datasets[0].data = noWarrantyLots.data;
+            chart5.update();
+
+            renderFabricationProblemSummary();
+        }
+
+        function escapeHTML(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function getFabricationProblemSummaryData() {
+            const grouped = {};
+
+            appData.forEach(item => {
+                const dateKey = item.purchaseDate || 'Não Informada';
+                const problem = String(item.defect || '').trim() || 'Problema não informado';
+
+                if (!grouped[dateKey]) grouped[dateKey] = { total: 0, problems: {} };
+                grouped[dateKey].total += 1;
+                grouped[dateKey].problems[problem] = (grouped[dateKey].problems[problem] || 0) + 1;
+            });
+
+            const keys = Object.keys(grouped);
+            keys.sort((a, b) => {
+                if (a === 'Não Informada') return 1;
+                if (b === 'Não Informada') return -1;
+                return a.localeCompare(b);
+            });
+
+            return keys.map(dateKey => {
+                const formattedDate = dateKey === 'Não Informada' ? 'Não Informada' : moment(dateKey, 'YYYY-MM-DD').format('L');
+                const problems = Object.entries(grouped[dateKey].problems)
+                    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))
+                    .map(([name, count]) => ({ name, count }));
+                return { dateKey, formattedDate, total: grouped[dateKey].total, problems };
+            });
+        }
+
+        function buildFabricationProblemSummaryHTML(isPdf = false) {
+            const rows = getFabricationProblemSummaryData();
+            if (!rows.length) {
+                return '<div class="fab-summary-empty">Nenhum item cadastrado.</div>';
+            }
+
+            const body = rows.map(row => {
+                const problemsHTML = row.problems.map(p =>
+                    `<li>${escapeHTML(p.name)} <strong>(${p.count})</strong></li>`
+                ).join('');
+
+                return `<tr>
+                    <td><strong>${escapeHTML(row.formattedDate)}</strong></td>
+                    <td>${row.total}</td>
+                    <td><ul class="fab-problem-list">${problemsHTML}</ul></td>
+                </tr>`;
+            }).join('');
+
+            return `<table class="fab-summary-table">
+                <thead><tr><th>Data de Fabricação</th><th>Qtd.</th><th>Problemas identificados</th></tr></thead>
+                <tbody>${body}</tbody>
+            </table>`;
+        }
+
+        function renderFabricationProblemSummary() {
+            const dashTarget = document.getElementById('fabrication-problem-summary');
+            if (dashTarget) {
+                dashTarget.className = '';
+                dashTarget.innerHTML = buildFabricationProblemSummaryHTML(false);
+            }
+
+            const pdfTarget = document.getElementById('pdf-fabrication-problem-summary');
+            if (pdfTarget) pdfTarget.innerHTML = buildFabricationProblemSummaryHTML(true);
+        }
+
+        function aggregateLotsByMonth(items) {
             const rawDates = {};
-            appData.forEach(i => {
-                if(i.purchaseDate) {
+            items.forEach(i => {
+                if (i.purchaseDate) {
                     const ym = i.purchaseDate.substring(0, 7);
                     rawDates[ym] = (rawDates[ym] || 0) + 1;
                 } else {
@@ -650,7 +770,7 @@
             const labels = [];
             const data = [];
             const validKeys = Object.keys(rawDates).filter(k => k !== 'Não Informada').sort();
-            
+
             validKeys.forEach(k => {
                 const parts = k.split('-');
                 labels.push(`${parts[1]}/${parts[0]}`);
@@ -662,9 +782,7 @@
                 data.push(rawDates['Não Informada']);
             }
 
-            chart3.data.labels = labels;
-            chart3.data.datasets[0].data = data;
-            chart3.update();
+            return { labels, data };
         }
 
         function initCharts() {
@@ -703,6 +821,17 @@
                 data: { labels: [], datasets: [{ label:'Peças com Defeito', data: [], borderColor:'#8e44ad', backgroundColor:'rgba(142, 68, 173, 0.2)', fill: true, tension: 0.3 }] },
                 options: { animation: false, maintainAspectRatio: false, plugins: { title: {display:true, text:'Lotes de Fabricação c/ Falha'}, legend: {display:false} }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
             });
+            chart4 = new Chart(document.getElementById('chart4'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label:'Peças em Garantia', data: [], borderColor:'#27ae60', backgroundColor:'rgba(39, 174, 96, 0.18)', fill: true, tension: 0.3 }] },
+                options: { animation: false, maintainAspectRatio: false, plugins: { title: {display:true, text:'Lotes de Fabricação c/ Falha — Em Garantia'}, legend: {display:false} }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+            chart5 = new Chart(document.getElementById('chart5'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label:'Peças sem Garantia', data: [], borderColor:'#c0392b', backgroundColor:'rgba(192, 57, 43, 0.18)', fill: true, tension: 0.3 }] },
+                options: { animation: false, maintainAspectRatio: false, plugins: { title: {display:true, text:'Lotes de Fabricação c/ Falha — Sem Garantia'}, legend: {display:false} }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+            updateDash();
         }
 
         // --- 6. SALVAR E CARREGAR PROJETO ---
@@ -851,7 +980,7 @@
                 },
                 logo: companyLogoBase64,
                 products: appData,
-                _backupInfo: { version: '7.5', embeddedInPdf: true, externalJsonSavedWithPdf: true, createdAt: new Date().toISOString() }
+                _backupInfo: { version: '7.8', embeddedInPdf: true, externalJsonSavedWithPdf: true, createdAt: new Date().toISOString() }
             };
         }
 
@@ -972,6 +1101,128 @@
             return currentY + imgHeight + 5; 
         }
 
+        // Blocos altos (especialmente o Dashboard) podem ultrapassar o espaço restante
+        // da página. Em vez de jogar o bloco inteiro para a página seguinte, esta função
+        // usa o espaço disponível e continua nas páginas seguintes. Sempre que possível,
+        // o corte ocorre entre cartões, linhas de gráficos ou linhas da tabela-resumo.
+        async function addPaginatedSectionToPDF(doc, domElement, currentY, margin, pageWidth, pageHeight) {
+            if (!domElement) return currentY;
+
+            const elementRect = domElement.getBoundingClientRect();
+            const safeSelectors = [
+                'h4',
+                '.pdf-stats-row',
+                '.pdf-chart-img',
+                '.pdf-fab-summary h5',
+                '.pdf-fab-summary tr'
+            ];
+
+            const safeBreaksCss = [];
+            domElement.querySelectorAll(safeSelectors.join(',')).forEach(el => {
+                const rect = el.getBoundingClientRect();
+                const bottom = rect.bottom - elementRect.top;
+                if (bottom > 0 && bottom < elementRect.height) safeBreaksCss.push(bottom);
+            });
+
+            const canvas = await html2canvas(domElement, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff'
+            });
+
+            const imgWidth = pageWidth - (margin * 2);
+            const pxPerMm = canvas.width / imgWidth;
+            const cssToCanvas = elementRect.height > 0 ? canvas.height / elementRect.height : 1;
+            const safeBreaksPx = [...new Set(
+                safeBreaksCss.map(v => Math.round(v * cssToCanvas))
+            )].sort((a, b) => a - b);
+
+            let sourceY = 0;
+            const minUsefulSpaceMm = 35;
+
+            while (sourceY < canvas.height) {
+                let availableMm = (pageHeight - margin) - currentY;
+
+                // Evita iniciar uma nova parte em uma faixa muito pequena no rodapé.
+                if (availableMm < minUsefulSpaceMm) {
+                    doc.addPage();
+                    currentY = margin;
+                    availableMm = (pageHeight - margin) - currentY;
+                }
+
+                const maxSlicePx = Math.max(1, Math.floor(availableMm * pxPerMm));
+                let targetEndPx = Math.min(canvas.height, sourceY + maxSlicePx);
+
+                if (targetEndPx < canvas.height) {
+                    const minPreferredEnd = sourceY + Math.floor(maxSlicePx * 0.55);
+                    const candidates = safeBreaksPx.filter(v => v > minPreferredEnd && v <= targetEndPx);
+                    if (candidates.length) targetEndPx = candidates[candidates.length - 1];
+                }
+
+                // Proteção contra um ponto de quebra inválido ou repetido.
+                if (targetEndPx <= sourceY) {
+                    targetEndPx = Math.min(canvas.height, sourceY + maxSlicePx);
+                }
+
+                const sliceHeightPx = targetEndPx - sourceY;
+                const sliceCanvas = document.createElement('canvas');
+                sliceCanvas.width = canvas.width;
+                sliceCanvas.height = sliceHeightPx;
+                const ctx = sliceCanvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+                ctx.drawImage(
+                    canvas,
+                    0, sourceY, canvas.width, sliceHeightPx,
+                    0, 0, canvas.width, sliceHeightPx
+                );
+
+                const sliceImg = sliceCanvas.toDataURL('image/jpeg', 0.95);
+                const sliceHeightMm = sliceHeightPx / pxPerMm;
+                doc.addImage(sliceImg, 'JPEG', margin, currentY, imgWidth, sliceHeightMm);
+
+                currentY += sliceHeightMm + 4;
+                sourceY = targetEndPx;
+
+                if (sourceY < canvas.height) {
+                    doc.addPage();
+                    currentY = margin;
+                }
+            }
+
+            return currentY;
+        }
+
+        async function captureDashboardChartsForPDF() {
+            const dashView = document.getElementById('view-dash');
+            const previousStyle = dashView.getAttribute('style');
+            const wasActive = dashView.classList.contains('active');
+
+            // Chart.js precisa de uma área mensurável. Esta renderização temporária ocorre
+            // fora da tela e garante o PDF mesmo se o usuário nunca abriu o Dashboard.
+            dashView.style.display = 'block';
+            dashView.style.visibility = 'hidden';
+            dashView.style.position = 'absolute';
+            dashView.style.left = '-10000px';
+            dashView.style.top = '0';
+            dashView.style.width = '970px';
+            dashView.style.pointerEvents = 'none';
+
+            try {
+                updateDash();
+                [chart1, chart2, chart3, chart4, chart5].forEach(chart => chart && chart.resize());
+                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+                [chart1, chart2, chart3, chart4, chart5].forEach(chart => chart && chart.update('none'));
+                await new Promise(r => setTimeout(r, 80));
+
+                return [chart1, chart2, chart3, chart4, chart5].map(chart => chart.toBase64Image());
+            } finally {
+                if (previousStyle === null) dashView.removeAttribute('style');
+                else dashView.setAttribute('style', previousStyle);
+                if (wasActive) dashView.classList.add('active');
+            }
+        }
+
         async function generatePDF() {
             const btn = document.querySelector('button[onclick="generatePDF()"]');
 
@@ -998,8 +1249,10 @@
             btn.innerText = "⏳ Gerando PDF + JSON...";
             btn.disabled = true;
             syncDOMtoData(); 
+            renderFabricationProblemSummary();
             
             try {
+                const dashboardImages = await captureDashboardChartsForPDF();
                 document.getElementById('p-inspector').innerText = document.getElementById('inspector').value || '-';
                 document.getElementById('p-client').innerText = document.getElementById('client').value || '-';
                 document.getElementById('p-sac').innerText = document.getElementById('sac').value || '-';
@@ -1014,9 +1267,11 @@
                 document.getElementById('pdf-st-total').innerText = document.getElementById('st-total').innerText;
                 document.getElementById('pdf-st-yes').innerText = document.getElementById('st-yes').innerText;
                 document.getElementById('pdf-st-no').innerText = document.getElementById('st-no').innerText;
-                document.getElementById('pdf-img-chart1').src = chart1.toBase64Image();
-                document.getElementById('pdf-img-chart2').src = chart2.toBase64Image();
-                document.getElementById('pdf-img-chart3').src = chart3.toBase64Image();
+                document.getElementById('pdf-img-chart1').src = dashboardImages[0];
+                document.getElementById('pdf-img-chart2').src = dashboardImages[1];
+                document.getElementById('pdf-img-chart3').src = dashboardImages[2];
+                document.getElementById('pdf-img-chart4').src = dashboardImages[3];
+                document.getElementById('pdf-img-chart5').src = dashboardImages[4];
 
                 const container = document.getElementById('pdf-items');
                 container.innerHTML = '';
@@ -1066,7 +1321,7 @@
                 let currentY = margin;
 
                 currentY = await addSectionToPDF(doc, document.getElementById('pdf-block-header'), currentY, margin, pageWidth, pageHeight);
-                currentY = await addSectionToPDF(doc, document.getElementById('pdf-block-dash'), currentY, margin, pageWidth, pageHeight);
+                currentY = await addPaginatedSectionToPDF(doc, document.getElementById('pdf-block-dash'), currentY, margin, pageWidth, pageHeight);
 
                 const pdfProducts = document.querySelectorAll('.pdf-section-item');
                 for (let i = 0; i < pdfProducts.length; i++) {
@@ -1075,7 +1330,7 @@
 
                 await addSectionToPDF(doc, document.getElementById('pdf-block-footer'), currentY, margin, pageWidth, pageHeight);
 
-                // v7.5: um único snapshot de dados alimenta o JSON externo e o JSON incorporado no PDF.
+                // v7.8: um único snapshot de dados alimenta o JSON externo e o JSON incorporado no PDF.
                 const exportData = getExportData();
                 const jsonText = JSON.stringify(exportData, null, 2);
                 const jsonBytes = new TextEncoder().encode(jsonText);
@@ -1089,11 +1344,11 @@
                 const pdfLibDoc = await PDFLib.PDFDocument.load(rawPdf);
                 await pdfLibDoc.attach(jsonBytes, backupName, {
                     mimeType: 'application/json',
-                    description: 'Backup completo do projeto do Sistema de Inspecao v7.5',
+                    description: 'Backup completo do projeto do Sistema de Inspecao v7.8',
                     creationDate: new Date(),
                     modificationDate: new Date()
                 });
-                pdfLibDoc.setProducer('Advanced Labs - Sistema de Inspecao v7.5');
+                pdfLibDoc.setProducer('Advanced Labs - Sistema de Inspecao v7.8');
                 pdfLibDoc.setSubject('Relatorio de SAC com JSON externo e backup JSON incorporado');
                 const finalPdfBytes = await pdfLibDoc.save();
 
